@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DH Studio
 
-## Getting Started
+Plataforma web tipo Looker Studio para crear reportes editables con canvas, widgets, fuentes de datos y exportacion JSON.
 
-First, run the development server:
+## Flujo obligatorio
+
+- `/`: Home inicial. Permite crear un proyecto o abrir uno por `projectId`.
+- `/editor/[projectId]`: editor del proyecto.
+- `/view/[projectId]`: vista publica readonly si el proyecto esta compartido.
+
+La Home no lista proyectos. Para abrir un proyecto existente se debe ingresar directamente su `projectId`.
+
+## Identificador de proyecto
+
+Cada reporte tiene un `projectId` unico e inmutable generado con `crypto.randomUUID()` al crear el proyecto.
+
+El `projectId` se guarda y se usa en:
+
+- rutas internas
+- base de datos
+- paginas
+- widgets
+- fuentes de datos
+- links publicos
+- export/import JSON
+
+El nombre del proyecto puede repetirse. El `projectId` no.
+
+## Stack
+
+- Next.js + TypeScript + Tailwind CSS
+- shadcn/ui + lucide-react
+- Zustand
+- React Grid Layout
+- Apache ECharts
+- TanStack Table
+- Supabase/PostgreSQL
+
+## Instalacion
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+Abrir `http://localhost:3000`.
+
+## Variables de entorno
+
+Crear `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_anon_key
+```
+
+Sin estas variables la app corre en modo local usando `localStorage`. Con Supabase configurado, auth y guardado automatico persisten en PostgreSQL.
+
+## Base de datos
+
+Ejecutar [db/schema.sql](db/schema.sql) en el SQL editor de Supabase.
+
+Tablas:
+
+- `reports`: `id` interno opcional, `project_id` unico, `name`, `owner_id`, `is_public`, `theme`.
+- `report_pages`: pertenencia por `project_id`.
+- `datasets`: pertenencia por `project_id`.
+- `widgets`: pertenencia por `project_id` y `page_id`.
+
+## Funcionalidad incluida
+
+- Home inicial sin listado general de proyectos.
+- Crear proyecto con `crypto.randomUUID()`.
+- Buscar proyecto directo por `projectId`.
+- Autenticacion Supabase por email/password.
+- CRUD en estado para reportes, paginas, widgets y datasets.
+- Canvas con grilla, zoom, drag and resize.
+- Modo editar/ver y vista readonly.
+- Autosave con Supabase si esta configurado.
+- Undo/redo basico.
+- CSV upload, URL publica CSV/Google Sheets y datos demo.
+- Columnas tipadas e inferidas.
+- Graficos: barra, linea, torta, area, tabla, KPI y scorecard.
+- Configuracion visual de dataset, dimension, metrica, agregacion, orden y limite.
+- Panel de estilo con titulo, texto, colores, fondo, borde, leyenda e imagen.
+- Temas del reporte.
+- Exportar/importar JSON con `projectId`.
+
+## Scripts
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run lint
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
