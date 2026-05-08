@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,10 +9,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useEditorStore } from "@/store/editor-store";
-import type { Aggregation, ColumnType, ReportTheme } from "@/types";
+import type { Aggregation, ColumnType, ReportTheme, WidgetType } from "@/types";
+import { cn } from "@/lib/utils";
 
 const aggregations: Aggregation[] = ["sum", "avg", "count", "min", "max"];
 const EMPTY_SELECT_VALUE = "__none__";
+const defaultSeriesColors = ["#3333ff", "#00cc7e", "#ffc51a", "#ff7059", "#8a6df1", "#ff76e2"];
+const chartTypes: { value: WidgetType; label: string }[] = [
+  { value: "bar", label: "Barra vertical" },
+  { value: "horizontal_bar", label: "Barra horizontal" },
+  { value: "stacked_bar", label: "Barra apilada" },
+  { value: "line", label: "Línea" },
+  { value: "multi_line", label: "Múltiples líneas" },
+  { value: "area", label: "Área" },
+  { value: "combo", label: "Combo barra/línea" },
+  { value: "pie", label: "Torta" },
+  { value: "donut", label: "Dona" },
+  { value: "scatter", label: "Dispersión" },
+  { value: "table", label: "Tabla" },
+  { value: "kpi", label: "KPI" },
+  { value: "scorecard", label: "Scorecard" },
+];
+const editableChartTypes = new Set(chartTypes.map((item) => item.value));
 
 export function RightPanel() {
   const { report, activePageId, selectedWidgetId, updateWidget, removeWidget, updateTheme } = useEditorStore();
@@ -35,6 +53,7 @@ export function RightPanel() {
   const setStyle = (patch: Partial<typeof widget.style>) => updateWidget(widget.id, { style: { ...widget.style, ...patch } });
   const columns = dataset?.columns ?? [];
   const metricColumns = columns.filter((column) => column.type === "number");
+  const seriesColors = widget.style.seriesColors?.length ? widget.style.seriesColors : defaultSeriesColors;
 
   return (
     <aside className="w-80 shrink-0 border-l border-[var(--dh-border)] bg-white">
@@ -50,8 +69,29 @@ export function RightPanel() {
               </SelectContent>
             </Select>
           </Field>
-          <ColumnSelect label="Dimensión" value={widget.config.dimension} columns={columns} onChange={(value) => setConfig({ dimension: value })} />
-          <ColumnSelect label="Métrica" value={widget.config.metric} columns={metricColumns} onChange={(value) => setConfig({ metric: value })} />
+          {editableChartTypes.has(widget.type) ? (
+            <Field label="Tipo de gráfico">
+              <Select value={widget.type} onValueChange={(value) => updateWidget(widget.id, { type: value as WidgetType })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{chartTypes.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+          ) : null}
+          <ColumnList
+            label="Dimensiones"
+            values={widget.config.dimensions ?? (widget.config.dimension ? [widget.config.dimension] : [])}
+            columns={columns}
+            addLabel="Agregar dimensión"
+            onChange={(dimensions) => setConfig({ dimensions, dimension: dimensions[0] })}
+          />
+          <ColumnList
+            label="Métricas"
+            values={widget.config.metrics ?? (widget.config.metric ? [widget.config.metric] : [])}
+            columns={metricColumns}
+            addLabel="Agregar métrica"
+            onChange={(metrics) => setConfig({ metrics, metric: metrics[0] })}
+          />
+          <p className="text-xs text-[var(--dh-gray-700)]">Las dimensiones y métricas extra son opcionales. Para dispersión usá dos métricas numéricas: eje X y eje Y.</p>
           <Field label="Agregación">
             <Select value={widget.config.aggregation} onValueChange={(value) => setConfig({ aggregation: value as Aggregation })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -81,6 +121,31 @@ export function RightPanel() {
           </div>
           <Field label="Radio de borde"><Input type="number" value={widget.style.borderRadius ?? 4} onChange={(event) => setStyle({ borderRadius: Number(event.target.value) })} /></Field>
           <div className="flex items-center justify-between"><Label>Leyenda</Label><Switch checked={widget.style.showLegend ?? true} onCheckedChange={(showLegend) => setStyle({ showLegend })} /></div>
+          <div className="flex items-center justify-between"><Label>Etiquetas</Label><Switch checked={widget.style.showDataLabels ?? false} onCheckedChange={(showDataLabels) => setStyle({ showDataLabels })} /></div>
+          <div className="flex items-center justify-between"><Label>% en torta/dona</Label><Switch checked={widget.style.showPiePercent ?? false} onCheckedChange={(showPiePercent) => setStyle({ showPiePercent })} /></div>
+          <div className="flex items-center justify-between"><Label>Apilar series</Label><Switch checked={widget.style.stackSeries ?? false} onCheckedChange={(stackSeries) => setStyle({ stackSeries })} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Grosor línea"><Input type="number" min={1} max={8} value={widget.style.lineWidth ?? 2} onChange={(event) => setStyle({ lineWidth: Number(event.target.value) })} /></Field>
+            <Field label="Radio barra"><Input type="number" min={0} max={12} value={widget.style.barRadius ?? 3} onChange={(event) => setStyle({ barRadius: Number(event.target.value) })} /></Field>
+            <Field label="Radio interno"><Input type="number" min={0} max={80} value={widget.style.pieInnerRadius ?? 0} onChange={(event) => setStyle({ pieInnerRadius: Number(event.target.value) })} /></Field>
+            <Field label="Radio externo"><Input type="number" min={10} max={90} value={widget.style.pieOuterRadius ?? 58} onChange={(event) => setStyle({ pieOuterRadius: Number(event.target.value) })} /></Field>
+          </div>
+          <Field label="Colores de series">
+            <div className="grid grid-cols-6 gap-2">
+              {seriesColors.slice(0, 6).map((color, index) => (
+                <Input
+                  key={`${index}-${color}`}
+                  type="color"
+                  value={color}
+                  onChange={(event) => {
+                    const next = [...seriesColors];
+                    next[index] = event.target.value;
+                    setStyle({ seriesColors: next });
+                  }}
+                />
+              ))}
+            </div>
+          </Field>
           <Separator />
           <ThemeControls updateTheme={updateTheme} theme={report.theme} />
         </TabsContent>
@@ -93,16 +158,59 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
 }
 
-function ColumnSelect({ label, value, columns, onChange }: { label: string; value?: string; columns: { name: string; type: ColumnType }[]; onChange: (value: string | undefined) => void }) {
+function ColumnList({
+  label,
+  values,
+  columns,
+  addLabel,
+  onChange,
+}: {
+  label: string;
+  values: string[];
+  columns: { name: string; type: ColumnType }[];
+  addLabel: string;
+  onChange: (values: string[]) => void;
+}) {
+  const rows = values.length ? values : [""];
+
   return (
     <Field label={label}>
-      <Select value={value ?? EMPTY_SELECT_VALUE} onValueChange={(next) => onChange(!next || next === EMPTY_SELECT_VALUE ? undefined : next)}>
-        <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={EMPTY_SELECT_VALUE}>Sin selección</SelectItem>
-          {columns.map((column) => <SelectItem key={column.name} value={column.name}>{column.name} · {column.type}</SelectItem>)}
-        </SelectContent>
-      </Select>
+      <div className="space-y-2">
+        {rows.map((value, index) => (
+          <div key={`${label}-${index}`} className="flex items-center gap-2">
+            <Select
+              value={value || EMPTY_SELECT_VALUE}
+              onValueChange={(next) => {
+                const updated = [...values];
+                if (!next || next === EMPTY_SELECT_VALUE) updated.splice(index, 1);
+                else updated[index] = next;
+                onChange(updated);
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY_SELECT_VALUE}>Sin selección</SelectItem>
+                {columns.map((column) => <SelectItem key={column.name} value={column.name}>{column.name} · {column.type}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {rows.length > 1 ? (
+              <Button variant="ghost" size="icon-sm" onClick={() => onChange(values.filter((_, itemIndex) => itemIndex !== index))}>
+                <X className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </div>
+        ))}
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn("w-full", rows.some((value) => !value) && "opacity-60")}
+          onClick={() => onChange([...values, ""])}
+          disabled={columns.length === 0}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          {addLabel}
+        </Button>
+      </div>
     </Field>
   );
 }

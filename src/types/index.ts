@@ -3,9 +3,15 @@ export type ID = string;
 export type ColumnType = "text" | "number" | "date" | "boolean";
 export type WidgetType =
   | "bar"
+  | "horizontal_bar"
+  | "stacked_bar"
   | "line"
+  | "multi_line"
   | "pie"
+  | "donut"
   | "area"
+  | "combo"
+  | "scatter"
   | "table"
   | "kpi"
   | "scorecard"
@@ -49,7 +55,9 @@ export type WidgetFilter = {
 export type ChartConfig = {
   datasetId?: ID;
   dimension?: string;
+  dimensions?: string[];
   metric?: string;
+  metrics?: string[];
   aggregation: Aggregation;
   filters: WidgetFilter[];
   orderBy?: string;
@@ -66,6 +74,14 @@ export type WidgetStyle = {
   borderColor?: string;
   borderRadius?: number;
   showLegend?: boolean;
+  seriesColors?: string[];
+  lineWidth?: number;
+  barRadius?: number;
+  pieInnerRadius?: number;
+  pieOuterRadius?: number;
+  showDataLabels?: boolean;
+  showPiePercent?: boolean;
+  stackSeries?: boolean;
   imageUrl?: string;
   text?: string;
 };

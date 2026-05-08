@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { GridLayout, noCompactor, type Layout } from "react-grid-layout";
+import { getCompactor, GridLayout, type Layout } from "react-grid-layout";
 import { useEditorStore } from "@/store/editor-store";
 import { ChartRenderer } from "@/components/charts/chart-renderer";
 import { cn } from "@/lib/utils";
+
+const fixedGridCompactor = getCompactor(null, false, true);
 
 export function ReportCanvas() {
   const { report, activePageId, selectedWidgetId, mode, zoom, selectWidget, updateWidgetLayouts } = useEditorStore();
@@ -40,9 +42,9 @@ export function ReportCanvas() {
             width={1120}
             layout={layouts}
             gridConfig={{ cols: 12, rowHeight: 42, margin: [12, 12], containerPadding: [12, 12] }}
-            dragConfig={{ enabled: mode === "edit", threshold: 3 }}
+            dragConfig={{ enabled: mode === "edit", threshold: 10, handle: ".widget-drag-handle", cancel: ".widget-no-drag" }}
             resizeConfig={{ enabled: mode === "edit", handles: ["se"] }}
-            compactor={noCompactor}
+            compactor={fixedGridCompactor}
             onDragStop={commitLayout}
             onResizeStop={commitLayout}
           >
@@ -58,8 +60,13 @@ export function ReportCanvas() {
                   className={cn("dh-widget overflow-hidden border", selectedWidgetId === widget.id && mode === "edit" && "ring-2 ring-primary")}
                   style={{ background: widget.style.background, borderColor: widget.style.borderColor, borderRadius: widget.style.borderRadius }}
                 >
-                  {widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type) ? <div className="h-8 px-3 pt-2 text-sm font-semibold">{widget.style.title}</div> : null}
-                  <div className={cn("h-full", widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type) && "h-[calc(100%-2rem)]")}>
+                  {mode === "edit" ? (
+                    <div className={cn("widget-drag-handle flex h-5 cursor-grab items-center justify-center border-b border-[var(--dh-border)] bg-white/90 text-[10px] font-semibold text-[var(--dh-gray-700)] active:cursor-grabbing", selectedWidgetId !== widget.id && "opacity-0")}>
+                      mover
+                    </div>
+                  ) : null}
+                  {widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type) ? <div className="widget-no-drag h-8 px-3 pt-2 text-sm font-semibold">{widget.style.title}</div> : null}
+                  <div className={cn("widget-no-drag h-full", mode === "edit" && "h-[calc(100%-1.25rem)]", widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type) && "h-[calc(100%-2rem)]", mode === "edit" && widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type) && "h-[calc(100%-3.25rem)]")}>
                     <ChartRenderer widget={widget} dataset={dataset} />
                   </div>
                 </section>
