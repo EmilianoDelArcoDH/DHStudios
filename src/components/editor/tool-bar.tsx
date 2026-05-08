@@ -1,7 +1,15 @@
 "use client";
 
-import { BarChart3, Image as ImageIcon, LayoutTemplate, ListFilter, PieChart, ScatterChart, Table2, TextCursorInput, Type } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BarChart3, ChevronDown, Image as ImageIcon, LayoutTemplate, ListFilter, PieChart, ScatterChart, Table2, TextCursorInput, Type } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { useEditorStore } from "@/store/editor-store";
 import type { WidgetType } from "@/types";
@@ -28,10 +36,26 @@ export function ToolBar() {
 
   return (
     <div className="dh-toolbar flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b px-3">
-      {chartItems.map((item) => {
-        const Icon = item.icon;
-        return <Button key={item.type} variant="ghost" size="sm" onClick={() => addWidget(item.type)}><Icon className="mr-2 h-4 w-4" />{item.label}</Button>;
-      })}
+      <DropdownMenu>
+        <DropdownMenuTrigger aria-label="Abrir menu de graficos" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          <BarChart3 className="mr-2 h-4 w-4" />
+          Gr&aacute;ficos
+          <ChevronDown className="ml-1 h-3.5 w-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56">
+          <DropdownMenuLabel>Agregar gr&aacute;fico</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {chartItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <DropdownMenuItem key={item.type} onClick={() => addWidget(item.type)} className="h-8 cursor-pointer gap-2 px-2">
+                <Icon className="h-4 w-4 text-[var(--dh-gray-700)]" />
+                {item.label}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Separator orientation="vertical" className="mx-1 h-6" />
       <Button variant="ghost" size="sm" onClick={() => addWidget("control_text")}><ListFilter className="mr-2 h-4 w-4" />Control</Button>
       <Button variant="ghost" size="sm" onClick={() => addWidget("text")}><Type className="mr-2 h-4 w-4" />Texto</Button>
