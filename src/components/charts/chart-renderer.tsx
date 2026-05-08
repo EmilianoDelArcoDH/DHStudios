@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { Dataset, ReportWidget } from "@/types";
 import { buildSeries } from "@/lib/dataset";
@@ -74,7 +74,50 @@ function ChartRendererBase({ widget, dataset }: Props) {
     );
   }
 
-  return <ReactECharts option={option} style={{ height: "100%", width: "100%" }} notMerge lazyUpdate />;
+  return <MeasuredChart option={option} />;
+}
+
+function MeasuredChart({ option }: { option: object }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const updateSize = () => {
+      const rect = element.getBoundingClientRect();
+      setSize((current) => {
+        const width = Math.floor(rect.width);
+        const height = Math.floor(rect.height);
+        if (current.width === width && current.height === height) return current;
+        return { width, height };
+      });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const ready = size.width > 8 && size.height > 8;
+
+  return (
+    <div ref={ref} className="h-full min-h-0 w-full min-w-0">
+      {ready ? (
+        <ReactECharts
+          key={`${size.width}x${size.height}`}
+          option={option}
+          style={{ height: size.height, width: size.width }}
+          notMerge
+          lazyUpdate
+        />
+      ) : (
+        <div className="flex h-full items-center justify-center text-xs text-[var(--dh-gray-700)]">Preparando gráfico...</div>
+      )}
+    </div>
+  );
 }
 
 function DataTable({ dataset, limit }: { dataset: Dataset; limit: number }) {
