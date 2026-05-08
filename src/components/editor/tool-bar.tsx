@@ -5,6 +5,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -42,18 +43,43 @@ export function ToolBar() {
           Gr&aacute;ficos
           <ChevronDown className="ml-1 h-3.5 w-3.5" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56">
-          <DropdownMenuLabel>Agregar gr&aacute;fico</DropdownMenuLabel>
+        <DropdownMenuContent>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>Agregar gráfico</DropdownMenuLabel>
+
+            {chartItems.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <DropdownMenuItem
+                  key={item.type}
+                  onClick={() => addWidget(item.type)}
+                  className="h-8 cursor-pointer gap-2 px-2"
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuGroup>
+
           <DropdownMenuSeparator />
-          {chartItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <DropdownMenuItem key={item.type} onClick={() => addWidget(item.type)} className="h-8 cursor-pointer gap-2 px-2">
-                <Icon className="h-4 w-4 text-[var(--dh-gray-700)]" />
-                {item.label}
-              </DropdownMenuItem>
-            );
-          })}
+
+          <DropdownMenuItem onClick={() => addWidget("control_text")}>
+            Control
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => addWidget("text")}>
+            Texto
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => addWidget("image")}>
+            Imagen
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => addWidget("kpi")}>
+            KPI
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Separator orientation="vertical" className="mx-1 h-6" />
