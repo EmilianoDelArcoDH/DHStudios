@@ -14,6 +14,7 @@ export function importReport(json: string): Report {
   return {
     ...payload.report,
     projectId,
+    dataModel: payload.report.dataModel ?? { relationships: [] },
     pages: payload.report.pages.map((page) => ({
       ...page,
       projectId,

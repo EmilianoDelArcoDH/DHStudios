@@ -26,10 +26,16 @@ type EditorState = {
   addPage: () => void;
   updatePage: (pageId: string, patch: Partial<ReportPage>) => void;
   addWidget: (type: WidgetType) => void;
+  duplicateWidget: (widgetId: string) => void;
   updateWidget: (widgetId: string, patch: Partial<ReportWidget>) => void;
   updateWidgetLayouts: (layouts: { i: string; x: number; y: number; w: number; h: number }[]) => void;
+  toggleWidgetLocked: (widgetId: string) => void;
+  bringWidgetToFront: (widgetId: string) => void;
+  sendWidgetToBack: (widgetId: string) => void;
   removeWidget: (widgetId: string) => void;
   addDataset: (dataset: Dataset) => void;
+  removeDataset: (datasetId: string) => void;
+  updateDataModel: (dataModel: NonNullable<Report["dataModel"]>) => void;
   updateTheme: (theme: Partial<ReportTheme>) => void;
   undo: () => void;
   redo: () => void;
@@ -38,9 +44,71 @@ type EditorState = {
 
 const timestamp = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
+const fieldBelongsToDataset = (field: string | undefined, datasetId: string) => Boolean(field?.startsWith(`${datasetId}.`));
 
 function withHistory(state: EditorState, report: Report) {
   return { report, past: [...state.past.slice(-24), state.report], future: [], error: undefined };
+}
+
+function visibleDatasetName(name: string, datasets: Dataset[]) {
+  const existingNames = new Set(datasets.map((dataset) => dataset.name));
+  if (!existingNames.has(name)) return name;
+
+  let index = 2;
+  let nextName = `${name} (${index})`;
+  while (existingNames.has(nextName)) {
+    index += 1;
+    nextName = `${name} (${index})`;
+  }
+
+  return nextName;
+}
+
+function cleanWidgetDatasetReferences(widget: ReportWidget, datasetId: string): ReportWidget {
+  const usesDeletedDataset = widget.config.datasetId === datasetId || widget.config.baseDatasetId === datasetId;
+  const nextDimensions = (widget.config.dimensions ?? []).filter((field) => !fieldBelongsToDataset(field, datasetId));
+  const nextMetrics = (widget.config.metrics ?? []).filter((field) => !fieldBelongsToDataset(field, datasetId));
+  const nextFilters = (widget.config.filters ?? []).filter((filter) => !fieldBelongsToDataset(filter.column, datasetId));
+
+  if (usesDeletedDataset) {
+    return {
+      ...widget,
+      config: {
+        ...widget.config,
+        datasetId: undefined,
+        baseDatasetId: undefined,
+        dimension: undefined,
+        dimensions: [],
+        metric: undefined,
+        metrics: [],
+        filters: [],
+      },
+      updatedAt: timestamp(),
+    };
+  }
+
+  if (
+    nextDimensions.length === (widget.config.dimensions ?? []).length &&
+    nextMetrics.length === (widget.config.metrics ?? []).length &&
+    nextFilters.length === (widget.config.filters ?? []).length &&
+    !fieldBelongsToDataset(widget.config.dimension, datasetId) &&
+    !fieldBelongsToDataset(widget.config.metric, datasetId)
+  ) {
+    return widget;
+  }
+
+  return {
+    ...widget,
+    config: {
+      ...widget.config,
+      dimension: fieldBelongsToDataset(widget.config.dimension, datasetId) ? nextDimensions[0] : widget.config.dimension,
+      dimensions: nextDimensions,
+      metric: fieldBelongsToDataset(widget.config.metric, datasetId) ? nextMetrics[0] : widget.config.metric,
+      metrics: nextMetrics,
+      filters: nextFilters,
+    },
+    updatedAt: timestamp(),
+  };
 }
 
 function activePage(state: EditorState) {
@@ -59,6 +127,7 @@ function defaultWidget(type: WidgetType, projectId: string, pageId: string, data
     y: Infinity,
     w: isControl || isText ? 3 : 5,
     h: type === "scorecard" || type === "kpi" ? 3 : isControl || isText ? 2 : 5,
+    locked: false,
     config: {
       datasetId,
       dimension: undefined,
@@ -150,6 +219,32 @@ export const useEditorStore = create<EditorState>((set, get) => {
         };
       }),
 
+    duplicateWidget: (widgetId) =>
+      set((state) => {
+        const page = state.report.pages.find((item) => item.widgets.some((widget) => widget.id === widgetId));
+        const widget = page?.widgets.find((item) => item.id === widgetId);
+        if (!page || !widget) return state;
+
+        const duplicated: ReportWidget = {
+          ...widget,
+          id: uuid(),
+          x: Math.min(Math.max(0, widget.x + 1), Math.max(0, 12 - widget.w)),
+          y: widget.y + 1,
+          locked: false,
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+        };
+
+        return {
+          ...withHistory(state, {
+            ...state.report,
+            pages: state.report.pages.map((item) => (item.id === page.id ? { ...item, widgets: [...item.widgets, duplicated] } : item)),
+            updatedAt: timestamp(),
+          }),
+          selectedWidgetId: duplicated.id,
+        };
+      }),
+
     updateWidget: (widgetId, patch) =>
       set((state) =>
         withHistory(state, {
@@ -169,6 +264,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
         const pages = state.report.pages.map((page) => ({
           ...page,
           widgets: page.widgets.map((widget) => {
+            if (widget.locked) return widget;
             const layout = layoutById.get(widget.id);
             if (!layout) return widget;
             if (widget.x === layout.x && widget.y === layout.y && widget.w === layout.w && widget.h === layout.h) {
@@ -195,9 +291,84 @@ export const useEditorStore = create<EditorState>((set, get) => {
         }),
       ),
 
-    addDataset: (dataset) =>
+    toggleWidgetLocked: (widgetId) =>
       set((state) =>
-        withHistory(state, { ...state.report, datasets: [...state.report.datasets, { ...dataset, projectId: state.report.projectId }], updatedAt: timestamp() }),
+        withHistory(state, {
+          ...state.report,
+          pages: state.report.pages.map((page) => ({
+            ...page,
+            widgets: page.widgets.map((widget) => (widget.id === widgetId ? { ...widget, locked: !widget.locked, updatedAt: timestamp() } : widget)),
+          })),
+          updatedAt: timestamp(),
+        }),
+      ),
+
+    bringWidgetToFront: (widgetId) =>
+      set((state) =>
+        withHistory(state, {
+          ...state.report,
+          pages: state.report.pages.map((page) => {
+            const widget = page.widgets.find((item) => item.id === widgetId);
+            if (!widget) return page;
+            return { ...page, widgets: [...page.widgets.filter((item) => item.id !== widgetId), widget] };
+          }),
+          updatedAt: timestamp(),
+        }),
+      ),
+
+    sendWidgetToBack: (widgetId) =>
+      set((state) =>
+        withHistory(state, {
+          ...state.report,
+          pages: state.report.pages.map((page) => {
+            const widget = page.widgets.find((item) => item.id === widgetId);
+            if (!widget) return page;
+            return { ...page, widgets: [widget, ...page.widgets.filter((item) => item.id !== widgetId)] };
+          }),
+          updatedAt: timestamp(),
+        }),
+      ),
+
+    addDataset: (dataset) =>
+      set((state) => {
+        const nextDataset = {
+          ...dataset,
+          id: state.report.datasets.some((item) => item.id === dataset.id) ? uuid() : dataset.id || uuid(),
+          projectId: state.report.projectId,
+          name: visibleDatasetName(dataset.name || "Dataset", state.report.datasets),
+          createdAt: dataset.createdAt || timestamp(),
+          updatedAt: timestamp(),
+        };
+
+        return withHistory(state, { ...state.report, datasets: [...state.report.datasets, nextDataset], updatedAt: timestamp() });
+      }),
+
+    removeDataset: (datasetId) =>
+      set((state) => {
+        const removed = state.report.datasets.some((dataset) => dataset.id === datasetId);
+        if (!removed) return state;
+
+        const dataModel = {
+          relationships: (state.report.dataModel?.relationships ?? []).filter(
+            (relationship) => relationship.fromDatasetId !== datasetId && relationship.toDatasetId !== datasetId,
+          ),
+        };
+
+        return withHistory(state, {
+          ...state.report,
+          datasets: state.report.datasets.filter((dataset) => dataset.id !== datasetId),
+          dataModel,
+          pages: state.report.pages.map((page) => ({
+            ...page,
+            widgets: page.widgets.map((widget) => cleanWidgetDatasetReferences(widget, datasetId)),
+          })),
+          updatedAt: timestamp(),
+        });
+      }),
+
+    updateDataModel: (dataModel) =>
+      set((state) =>
+        withHistory(state, { ...state.report, dataModel, updatedAt: timestamp() }),
       ),
 
     updateTheme: (theme) =>

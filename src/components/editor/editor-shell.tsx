@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Eye, PanelLeftOpen, PanelRightOpen, Pencil } from "lucide-react";
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { ReportCanvas } from "@/components/editor/report-canvas";
 import { ToolBar } from "@/components/editor/tool-bar";
@@ -12,12 +13,21 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { useEditorStore } from "@/store/editor-store";
 import { Button } from "@/components/ui/button";
 import { reportService } from "@/services/report-service";
+import { cn } from "@/lib/utils";
+
+const PANEL_PREFS_KEY = "dhstudios.editor.panels";
+type EditorMode = "edit" | "preview";
 
 export function EditorShell({ projectId, readonly = false }: { projectId: string; readonly?: boolean }) {
   useAutosave();
-  const { error, report, setReport, setMode } = useEditorStore();
+  const { error, report, setReport, setMode, selectWidget } = useEditorStore();
   const [loadState, setLoadState] = useState<"loading" | "ready" | "not-found" | "forbidden" | "error">("loading");
   const [loadError, setLoadError] = useState("");
+  const [editorMode, setEditorMode] = useState<EditorMode>("edit");
+  const [panelPrefsLoaded, setPanelPrefsLoaded] = useState(false);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const isPreview = editorMode === "preview";
 
   useEffect(() => {
     let active = true;
@@ -51,6 +61,41 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
     document.documentElement.style.setProperty("--primary", report.theme.primary);
   }, [report.theme.primary]);
 
+  useEffect(() => {
+    const hydratePanels = window.setTimeout(() => {
+      try {
+        const saved = window.localStorage.getItem(PANEL_PREFS_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved) as Partial<{ leftPanelCollapsed: boolean; rightPanelCollapsed: boolean }>;
+          setLeftPanelCollapsed(Boolean(parsed.leftPanelCollapsed));
+          setRightPanelCollapsed(Boolean(parsed.rightPanelCollapsed));
+        }
+      } catch {
+        window.localStorage.removeItem(PANEL_PREFS_KEY);
+      } finally {
+        setPanelPrefsLoaded(true);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(hydratePanels);
+  }, []);
+
+  useEffect(() => {
+    if (!panelPrefsLoaded) return;
+    window.localStorage.setItem(PANEL_PREFS_KEY, JSON.stringify({ leftPanelCollapsed, rightPanelCollapsed }));
+  }, [leftPanelCollapsed, panelPrefsLoaded, rightPanelCollapsed]);
+
+  const enterPreview = () => {
+    selectWidget(undefined);
+    setMode("view");
+    setEditorMode("preview");
+  };
+
+  const exitPreview = () => {
+    setMode("edit");
+    setEditorMode("edit");
+  };
+
   if (loadState !== "ready") {
     return (
       <main className="flex h-screen flex-col items-center justify-center gap-4 bg-[var(--dh-gray-ui)] px-6 text-center">
@@ -65,16 +110,76 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      <TopBar readonly={readonly} />
-      {!readonly ? <ToolBar /> : null}
-      {error ? <div className="border-b bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div> : null}
-      <div className="flex min-h-0 flex-1">
-        {!readonly ? <LeftPanel /> : null}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {!readonly ? <div className="hidden border-b bg-white p-2 xl:block"><AuthPanel /></div> : null}
-          <ReportCanvas />
+      {isPreview ? (
+        <header className="dh-toolbar flex h-12 shrink-0 items-center gap-2 border-b px-3">
+          <Eye className="h-4 w-4 text-[var(--dh-gray-700)]" />
+          <span className="text-sm font-semibold">Preview</span>
+          <span className="rounded-sm border border-[var(--dh-border)] bg-white px-2 py-1 font-mono text-xs text-[var(--dh-gray-700)]">{report.projectId}</span>
+          <Button variant="outline" size="sm" className="ml-auto" onClick={exitPreview}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Volver a editar
+          </Button>
+        </header>
+      ) : (
+        <TopBar readonly={readonly} />
+      )}
+      {!readonly && !isPreview ? <ToolBar /> : null}
+      {!readonly && !isPreview ? (
+        <div className="border-b bg-white px-3 py-2">
+          <Button variant="outline" size="sm" onClick={enterPreview}>
+            <Eye className="mr-2 h-4 w-4" />
+            Preview
+          </Button>
         </div>
-        {!readonly ? <RightPanel /> : null}
+      ) : null}
+      {error && !isPreview ? <div className="border-b bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div> : null}
+      <div className="relative flex min-h-0 flex-1">
+        {!readonly && !isPreview ? (
+          <div
+            aria-hidden={leftPanelCollapsed}
+            className={cn("shrink-0 overflow-hidden transition-[width] duration-200 ease-out", leftPanelCollapsed ? "w-0" : "w-64")}
+          >
+            <LeftPanel onCollapse={() => setLeftPanelCollapsed(true)} />
+          </div>
+        ) : null}
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          {!readonly && !isPreview && leftPanelCollapsed ? (
+            <Button
+              type="button"
+              title="Mostrar panel izquierdo"
+              aria-label="Mostrar panel izquierdo"
+              variant="outline"
+              size="icon-sm"
+              className="absolute left-3 top-3 z-30 bg-white shadow-sm"
+              onClick={() => setLeftPanelCollapsed(false)}
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </Button>
+          ) : null}
+          {!readonly && !isPreview && rightPanelCollapsed ? (
+            <Button
+              type="button"
+              title="Mostrar panel derecho"
+              aria-label="Mostrar panel derecho"
+              variant="outline"
+              size="icon-sm"
+              className="absolute right-3 top-3 z-30 bg-white shadow-sm"
+              onClick={() => setRightPanelCollapsed(false)}
+            >
+              <PanelRightOpen className="h-4 w-4" />
+            </Button>
+          ) : null}
+          {!readonly && !isPreview ? <div className="hidden border-b bg-white p-2 xl:block"><AuthPanel /></div> : null}
+          <ReportCanvas preview={isPreview} />
+        </div>
+        {!readonly && !isPreview ? (
+          <div
+            aria-hidden={rightPanelCollapsed}
+            className={cn("shrink-0 overflow-hidden transition-[width] duration-200 ease-out", rightPanelCollapsed ? "w-0" : "w-80")}
+          >
+            <RightPanel onCollapse={() => setRightPanelCollapsed(true)} />
+          </div>
+        ) : null}
       </div>
     </div>
   );

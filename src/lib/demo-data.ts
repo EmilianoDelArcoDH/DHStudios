@@ -91,6 +91,7 @@ export function createEmptyReport(projectId = newId(), name = "Proyecto sin tít
     isPublic: false,
     theme: defaultTheme,
     datasets: [],
+    dataModel: { relationships: [] },
     pages: [
       {
         id: pageId,
@@ -123,6 +124,7 @@ export function createDemoReport(projectId = newId()): Report {
     isPublic: false,
     theme: defaultTheme,
     datasets: [dataset],
+    dataModel: { relationships: [] },
     pages: [
       {
         id: pageId,

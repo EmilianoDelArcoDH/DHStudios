@@ -54,6 +54,7 @@ export type WidgetFilter = {
 
 export type ChartConfig = {
   datasetId?: ID;
+  baseDatasetId?: ID;
   dimension?: string;
   dimensions?: string[];
   metric?: string;
@@ -95,6 +96,7 @@ export type ReportWidget = {
   y: number;
   w: number;
   h: number;
+  locked?: boolean;
   config: ChartConfig;
   style: WidgetStyle;
   createdAt: string;
@@ -130,6 +132,7 @@ export type Report = {
   theme: ReportTheme;
   pages: ReportPage[];
   datasets: Dataset[];
+  dataModel?: import("@/lib/data-model/types").DataModel;
   createdAt: string;
   updatedAt: string;
 };

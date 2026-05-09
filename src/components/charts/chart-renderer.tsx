@@ -5,6 +5,8 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { ChartConfig, Dataset, DatasetRow, ReportWidget } from "@/types";
 import { aggregate, applyFilters } from "@/lib/dataset";
+import { executeWidgetQuery, queryFieldFromKey } from "@/lib/data-model/query";
+import type { DataModel } from "@/lib/data-model/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), {
@@ -15,6 +17,8 @@ const ReactECharts = dynamic(() => import("echarts-for-react"), {
 type Props = {
   widget: ReportWidget;
   dataset?: Dataset;
+  datasets?: Dataset[];
+  dataModel?: DataModel;
 };
 
 const defaultColors = ["#3333ff", "#00cc7e", "#ffc51a", "#ff7059", "#8a6df1", "#ff76e2"];
@@ -28,8 +32,8 @@ const bottomLegend = {
 };
 const pieLegend = {
   ...bottomLegend,
-  bottom: 4,
-  padding: [14, 0, 0, 0],
+  bottom: 6,
+  padding: [18, 0, 0, 0],
 };
 
 function activeDimensions(config: ChartConfig) {
@@ -84,8 +88,34 @@ function buildChartData(dataset: Dataset | undefined, config: ChartConfig) {
   return { dimensions, metrics, rows, categories, series };
 }
 
-function ChartRendererBase({ widget, dataset }: Props) {
-  const chartData = useMemo(() => buildChartData(dataset, widget.config), [dataset, widget.config]);
+function buildModelChartData(datasets: Dataset[] | undefined, dataModel: DataModel | undefined, config: ChartConfig) {
+  const baseDatasetId = config.baseDatasetId ?? config.datasetId;
+  if (!baseDatasetId || !datasets?.length) return undefined;
+
+  const dimensions = activeDimensions(config).map((key) => queryFieldFromKey(key, baseDatasetId));
+  const metrics = activeMetrics(config).map((key) => queryFieldFromKey(key, baseDatasetId));
+  const hasModelField = [...dimensions, ...metrics].some((field) => field.datasetId !== baseDatasetId);
+  if (!hasModelField && !dataModel?.relationships.length) return undefined;
+
+  return executeWidgetQuery(
+    {
+      baseDatasetId,
+      dimensions,
+      metrics,
+      aggregation: config.aggregation,
+      limit: config.limit,
+      orderDirection: config.orderDirection,
+    },
+    datasets,
+    dataModel,
+  );
+}
+
+function ChartRendererBase({ widget, dataset, datasets, dataModel }: Props) {
+  const chartData = useMemo(
+    () => buildModelChartData(datasets, dataModel, widget.config) ?? buildChartData(dataset, widget.config),
+    [dataModel, dataset, datasets, widget.config],
+  );
   const option = useMemo(
     () => {
       const colors = widget.style.seriesColors?.length ? widget.style.seriesColors : defaultColors;
@@ -93,7 +123,7 @@ function ChartRendererBase({ widget, dataset }: Props) {
       const showLegend = widget.style.showLegend ?? true;
       const showPiePercent = widget.style.showPiePercent ?? false;
       const requestedPieOuterRadius = widget.style.pieOuterRadius ?? 58;
-      const pieOuterRadius = showLegend ? Math.min(requestedPieOuterRadius, 56) : requestedPieOuterRadius;
+      const pieOuterRadius = showLegend ? Math.min(Math.max(requestedPieOuterRadius, 66), 72) : requestedPieOuterRadius;
       const pieRadius = widget.type === "donut"
         ? [`${widget.style.pieInnerRadius ?? 45}%`, `${pieOuterRadius}%`]
         : [`${widget.style.pieInnerRadius ?? 0}%`, `${pieOuterRadius}%`];
@@ -119,9 +149,9 @@ function ChartRendererBase({ widget, dataset }: Props) {
           series: [{
             type: "pie",
             radius: pieRadius,
-            center: ["50%", showLegend ? "36%" : "50%"],
+            center: ["50%", showLegend ? "40%" : "50%"],
             top: 0,
-            bottom: showLegend ? 74 : 0,
+            bottom: showLegend ? 58 : 0,
             avoidLabelOverlap: true,
             label: {
               show: widget.style.showDataLabels,
@@ -208,7 +238,17 @@ function ChartRendererBase({ widget, dataset }: Props) {
 
   if (!dataset) return <EmptyWidget label="Seleccioná una fuente de datos" />;
 
-  if (widget.type === "table") return <DataTable dataset={dataset} limit={widget.config.limit ?? 20} />;
+  if (widget.type === "table") {
+    const selectedColumns = activeDimensions(widget.config);
+    const fallbackColumns = dataset.columns.map((column) => column.name);
+    return (
+      <DataTable
+        rows={chartData.rows}
+        columnKeys={selectedColumns.length ? selectedColumns : fallbackColumns}
+        limit={widget.config.limit ?? 20}
+      />
+    );
+  }
 
   if (widget.type === "kpi" || widget.type === "scorecard") {
     const value = chartData.series[0]?.data[0] ?? 0;
@@ -268,16 +308,17 @@ function MeasuredChart({ option }: { option: object }) {
   );
 }
 
-function DataTable({ dataset, limit }: { dataset: Dataset; limit: number }) {
+function DataTable({ rows, columnKeys, limit }: { rows: DatasetRow[]; columnKeys: string[]; limit: number }) {
   const columns = useMemo(
-    () => dataset.columns.map((column) => ({
-      accessorKey: column.name,
-      header: column.name,
+    () => columnKeys.map((column) => ({
+      id: column,
+      accessorFn: (row: DatasetRow) => row[column],
+      header: readableColumnName(column),
       cell: (info: { getValue: () => unknown }) => String(info.getValue() ?? ""),
     })),
-    [dataset.columns],
+    [columnKeys],
   );
-  const data = useMemo(() => dataset.rows.slice(0, limit), [dataset.rows, limit]);
+  const data = useMemo(() => rows.slice(0, limit), [rows, limit]);
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
 
@@ -301,6 +342,11 @@ function DataTable({ dataset, limit }: { dataset: Dataset; limit: number }) {
       </Table>
     </div>
   );
+}
+
+function readableColumnName(column: string) {
+  const separator = column.indexOf(".");
+  return separator === -1 ? column : column.slice(separator + 1);
 }
 
 function EmptyWidget({ label }: { label: string }) {

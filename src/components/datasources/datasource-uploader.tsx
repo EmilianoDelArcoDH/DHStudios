@@ -39,7 +39,15 @@ export function DatasourceUploader() {
       <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[var(--dh-border)] bg-white text-sm font-semibold hover:bg-accent">
         <FileUp className="h-4 w-4" />
         Subir CSV
-        <input type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => void onFile(event.target.files?.[0])} />
+        <input
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={(event) => {
+            void onFile(event.target.files?.[0]);
+            event.target.value = "";
+          }}
+        />
       </label>
       <div className="space-y-2">
         <Label>Sheets publicado o CSV URL</Label>
