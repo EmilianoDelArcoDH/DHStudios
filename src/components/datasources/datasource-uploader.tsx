@@ -36,7 +36,7 @@ export function DatasourceUploader() {
 
   return (
     <div className="space-y-3">
-      <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[var(--dh-border)] bg-white text-sm font-semibold hover:bg-accent">
+      <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[var(--dh-border)] bg-card text-sm font-semibold hover:bg-accent">
         <FileUp className="h-4 w-4" />
         Subir CSV
         <input

@@ -100,7 +100,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
     return (
       <main className="flex h-screen flex-col items-center justify-center gap-4 bg-[var(--dh-gray-ui)] px-6 text-center">
         <h1 className="text-xl font-semibold">{loadState === "loading" ? "Cargando proyecto..." : loadState === "not-found" ? "Proyecto no encontrado" : loadState === "forbidden" ? "Proyecto no compartido" : "No se pudo abrir el proyecto"}</h1>
-        <p className="max-w-md text-sm text-[var(--dh-gray-700)]">
+        <p className="max-w-md text-sm text-muted-foreground">
           {loadState === "loading" ? projectId : loadState === "not-found" ? "No se encontró un proyecto con ese projectId." : loadState === "forbidden" ? "Este proyecto existe, pero no está marcado como público." : loadError}
         </p>
         {loadState !== "loading" ? <Button variant="outline"><Link href="/">Volver al Home</Link></Button> : null}
@@ -112,9 +112,9 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       {isPreview ? (
         <header className="dh-toolbar flex h-12 shrink-0 items-center gap-2 border-b px-3">
-          <Eye className="h-4 w-4 text-[var(--dh-gray-700)]" />
+          <Eye className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold">Preview</span>
-          <span className="rounded-sm border border-[var(--dh-border)] bg-white px-2 py-1 font-mono text-xs text-[var(--dh-gray-700)]">{report.projectId}</span>
+          <span className="rounded-sm border border-[var(--dh-border)] bg-card px-2 py-1 font-mono text-xs text-muted-foreground">{report.projectId}</span>
           <Button variant="outline" size="sm" className="ml-auto" onClick={exitPreview}>
             <Pencil className="mr-2 h-4 w-4" />
             Volver a editar
@@ -125,7 +125,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
       )}
       {!readonly && !isPreview ? <ToolBar /> : null}
       {!readonly && !isPreview ? (
-        <div className="border-b bg-white px-3 py-2">
+        <div className="border-b bg-card px-3 py-2">
           <Button variant="outline" size="sm" onClick={enterPreview}>
             <Eye className="mr-2 h-4 w-4" />
             Preview
@@ -150,7 +150,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
               aria-label="Mostrar panel izquierdo"
               variant="outline"
               size="icon-sm"
-              className="absolute left-3 top-3 z-30 bg-white shadow-sm"
+              className="absolute left-3 top-3 z-30 bg-card shadow-sm"
               onClick={() => setLeftPanelCollapsed(false)}
             >
               <PanelLeftOpen className="h-4 w-4" />
@@ -163,13 +163,13 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
               aria-label="Mostrar panel derecho"
               variant="outline"
               size="icon-sm"
-              className="absolute right-3 top-3 z-30 bg-white shadow-sm"
+              className="absolute right-3 top-3 z-30 bg-card shadow-sm"
               onClick={() => setRightPanelCollapsed(false)}
             >
               <PanelRightOpen className="h-4 w-4" />
             </Button>
           ) : null}
-          {!readonly && !isPreview ? <div className="hidden border-b bg-white p-2 xl:block"><AuthPanel /></div> : null}
+          {!readonly && !isPreview ? <div className="hidden border-b bg-card p-2 xl:block"><AuthPanel /></div> : null}
           <ReportCanvas preview={isPreview} />
         </div>
         {!readonly && !isPreview ? (

@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), {
   ssr: false,
-  loading: () => <div className="flex h-full items-center justify-center text-xs text-[var(--dh-gray-700)]">Cargando gráfico...</div>,
+  loading: () => <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Cargando gráfico...</div>,
 });
 
 type Props = {
@@ -254,9 +254,9 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel }: Props) {
     const value = chartData.series[0]?.data[0] ?? 0;
     return (
       <div className="flex h-full flex-col justify-center px-4">
-        <span className="text-xs text-[var(--dh-gray-700)]">{widget.style.title}</span>
+        <span className="text-xs text-muted-foreground">{widget.style.title}</span>
         <strong className="font-mono text-3xl tracking-normal">{Intl.NumberFormat("es-AR").format(value)}</strong>
-        <span className="text-xs text-[var(--dh-gray-700)]">{widget.config.aggregation} de {widget.config.metric ?? "registros"}</span>
+        <span className="text-xs text-muted-foreground">{widget.config.aggregation} de {widget.config.metric ?? "registros"}</span>
       </div>
     );
   }
@@ -302,7 +302,7 @@ function MeasuredChart({ option }: { option: object }) {
           autoResize
         />
       ) : (
-        <div className="flex h-full items-center justify-center text-xs text-[var(--dh-gray-700)]">Preparando gráfico...</div>
+        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Preparando gráfico...</div>
       )}
     </div>
   );
@@ -350,7 +350,7 @@ function readableColumnName(column: string) {
 }
 
 function EmptyWidget({ label }: { label: string }) {
-  return <div className="flex h-full items-center justify-center text-sm text-[var(--dh-gray-700)]">{label}</div>;
+  return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{label}</div>;
 }
 
 export const ChartRenderer = memo(ChartRendererBase);

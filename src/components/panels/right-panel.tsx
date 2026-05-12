@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useEditorStore } from "@/store/editor-store";
-import type { Aggregation, ColumnType, Dataset, ReportTheme, WidgetStyle, WidgetType } from "@/types";
+import type { Aggregation, ColumnType, Dataset, WidgetStyle, WidgetType } from "@/types";
 import { cn } from "@/lib/utils";
 import type { DataModel, DatasetRelationship } from "@/lib/data-model/types";
 
@@ -56,7 +56,7 @@ function compatibleTypes(type: WidgetType) {
 }
 
 export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
-  const { report, activePageId, selectedWidgetId, updateWidget, removeWidget, updateTheme, updateDataModel } = useEditorStore();
+  const { report, activePageId, selectedWidgetId, updateWidget, removeWidget, updateDataModel } = useEditorStore();
   const page = report.pages.find((item) => item.id === activePageId);
   const widget = page?.widgets.find((item) => item.id === selectedWidgetId);
   const dataset = report.datasets.find((item) => item.id === widget?.config.datasetId);
@@ -64,7 +64,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
   if (!widget) {
     return (
-      <aside className="flex h-full w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--dh-border)] bg-white">
+      <aside className="flex h-full w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--dh-border)] bg-card">
         <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
           <h2 className="text-sm font-semibold">Propiedades</h2>
           {onCollapse ? (
@@ -74,11 +74,9 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
           ) : null}
         </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
-          <p className="text-sm text-[var(--dh-gray-700)]">No hay componente seleccionado.</p>
+          <p className="text-sm text-muted-foreground">No hay componente seleccionado.</p>
           <Separator />
           <DataModelControls reportDatasets={report.datasets} dataModel={dataModel} updateDataModel={updateDataModel} />
-          <Separator />
-          <ThemeControls updateTheme={updateTheme} theme={report.theme} />
         </div>
       </aside>
     );
@@ -112,7 +110,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
   };
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-l border-[var(--dh-border)] bg-white">
+    <aside className="flex h-full w-80 shrink-0 flex-col border-l border-[var(--dh-border)] bg-card">
       <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
         <h2 className="text-sm font-semibold">Propiedades</h2>
         {onCollapse ? (
@@ -261,8 +259,6 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           <Separator />
           <DataModelControls reportDatasets={report.datasets} dataModel={dataModel} updateDataModel={updateDataModel} />
-          <Separator />
-          <ThemeControls updateTheme={updateTheme} theme={report.theme} />
         </TabsContent>
       </Tabs>
     </aside>
@@ -354,7 +350,7 @@ function DataModelControls({
         </Button>
       </div>
       {dataModel.relationships.length === 0 ? (
-        <p className="text-xs text-[var(--dh-gray-700)]">Agrega relaciones como ventas.id_producto - productos.id_producto para usar dimensiones relacionadas.</p>
+        <p className="text-xs text-muted-foreground">Agrega relaciones como ventas.id_producto - productos.id_producto para usar dimensiones relacionadas.</p>
       ) : null}
       {dataModel.relationships.map((relationship) => {
         const fromDataset = reportDatasets.find((dataset) => dataset.id === relationship.fromDatasetId) ?? reportDatasets[0];
@@ -362,10 +358,10 @@ function DataModelControls({
         const matchInfo = getRelationshipMatchInfo(fromDataset, toDataset, relationship.fromColumn, relationship.toColumn);
 
         return (
-          <div key={relationship.id} className="space-y-3 rounded-md border border-[var(--dh-border)] bg-white p-3">
+          <div key={relationship.id} className="space-y-3 rounded-md border border-[var(--dh-border)] bg-card p-3">
             <div className="space-y-3">
               <div className="space-y-2">
-                <p className="text-[11px] font-medium uppercase tracking-normal text-[var(--dh-gray-700)]">Datasets</p>
+                <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">Datasets</p>
                 <DatasetSelect label="Tabla base" datasets={reportDatasets} value={relationship.fromDatasetId} onChange={(fromDatasetId) => {
                   const nextDataset = reportDatasets.find((dataset) => dataset.id === fromDatasetId);
                   const nextColumns = pickRelationshipColumns(nextDataset, toDataset);
@@ -383,12 +379,12 @@ function DataModelControls({
               </div>
 
               <div className="space-y-2 border-t border-[var(--dh-border)] pt-3">
-                <p className="text-[11px] font-medium uppercase tracking-normal text-[var(--dh-gray-700)]">Campos de union</p>
+                <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">Campos de union</p>
                 <SingleColumnSelect label="ID en base" value={relationship.fromColumn} columns={fromDataset?.columns ?? []} onChange={(fromColumn) => updateRelationship(relationship.id, { fromColumn: fromColumn ?? "" })} />
                 <SingleColumnSelect label="ID relacionado" value={relationship.toColumn} columns={toDataset?.columns ?? []} onChange={(toColumn) => updateRelationship(relationship.id, { toColumn: toColumn ?? "" })} />
               </div>
             </div>
-            <p className="rounded-md bg-[var(--dh-gray-ui)] px-2 py-1.5 text-[11px] leading-4 text-[var(--dh-gray-700)]">
+            <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
               {fromDataset?.name ?? "Base"}.{relationship.fromColumn || "id"} - {toDataset?.name ?? "Relacionado"}.{relationship.toColumn || "id"}
             </p>
             {matchInfo ? (
@@ -641,15 +637,3 @@ function ColumnList({
   );
 }
 
-function ThemeControls({ theme, updateTheme }: { theme: ReportTheme; updateTheme: (theme: Partial<ReportTheme>) => void }) {
-  return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold">Tema del reporte</h3>
-      <div className="grid grid-cols-3 gap-2">
-        <Field label="Primario"><Input type="color" value={theme.primary} onChange={(event) => updateTheme({ primary: event.target.value })} /></Field>
-        <Field label="Acento"><Input type="color" value={theme.accent} onChange={(event) => updateTheme({ accent: event.target.value })} /></Field>
-        <Field label="Hoja"><Input type="color" value={theme.pageBackground} onChange={(event) => updateTheme({ pageBackground: event.target.value })} /></Field>
-      </div>
-    </div>
-  );
-}

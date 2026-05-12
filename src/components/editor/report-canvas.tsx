@@ -93,7 +93,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
         }}
       >
         {page.widgets.length === 0 ? (
-          <div className="flex h-[720px] items-center justify-center text-sm text-[var(--dh-gray-700)]">Agregá gráficos, controles o texto desde la barra superior.</div>
+          <div className="flex h-[720px] items-center justify-center text-sm text-muted-foreground">Agregá gráficos, controles o texto desde la barra superior.</div>
         ) : (
           <div className="relative min-h-[920px]">
           <SmartGuideOverlay guides={smartGuides} />
@@ -134,7 +134,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
                     />
                   ) : null}
                   {mode === "edit" ? (
-                    <div className={cn("widget-drag-handle flex h-5 items-center justify-center border-b border-[var(--dh-border)] bg-white/90 text-[10px] font-semibold text-[var(--dh-gray-700)]", widget.locked ? "widget-locked cursor-default" : "cursor-grab active:cursor-grabbing", !selected && "opacity-0")}>
+                    <div className={cn("widget-drag-handle flex h-5 items-center justify-center border-b border-[var(--dh-border)] bg-background/90 text-[10px] font-semibold text-muted-foreground", widget.locked ? "widget-locked cursor-default" : "cursor-grab active:cursor-grabbing", !selected && "opacity-0")}>
                       {widget.locked ? "bloqueado" : "mover"}
                     </div>
                   ) : null}
@@ -280,7 +280,7 @@ function WidgetFloatingToolbar({
   };
 
   return (
-    <div className="widget-no-drag absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md border border-[var(--dh-border)] bg-white/95 p-1 shadow-md">
+    <div className="widget-no-drag absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md border border-[var(--dh-border)] bg-card/95 p-1 shadow-md">
       <ToolbarButton label="Duplicar widget" onClick={(event) => stopAndRun(event, onDuplicate)}>
         <Copy className="h-3.5 w-3.5" />
       </ToolbarButton>

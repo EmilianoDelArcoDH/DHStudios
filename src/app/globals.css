@@ -51,6 +51,7 @@
 }
 
 :root {
+  color-scheme: light;
   --dh-white: #ffffff;
   --dh-black: #000000;
   --dh-blue: #3333ff;
@@ -102,37 +103,47 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  color-scheme: dark;
+  --dh-white: #20242a;
+  --dh-black: #f7f8fa;
+  --dh-gray-900: #eef2f7;
+  --dh-gray-700: #b9c0c9;
+  --dh-gray-500: #8b94a1;
+  --dh-gray-400: #737d8b;
+  --dh-gray-200: #2c323a;
+  --dh-gray-ui: #14171b;
+  --dh-border: rgb(255 255 255 / 11%);
+  --background: #17191d;
+  --foreground: #f7f8fa;
+  --card: #20242a;
+  --card-foreground: #f7f8fa;
+  --popover: #20242a;
+  --popover-foreground: #f7f8fa;
+  --primary: #3333ff;
+  --primary-foreground: #ffffff;
+  --secondary: #262b31;
+  --secondary-foreground: #f7f8fa;
+  --muted: #262b31;
+  --muted-foreground: #b9c0c9;
+  --accent: #262b31;
+  --accent-foreground: #f7f8fa;
+  --destructive: #ff7059;
+  --border: rgb(255 255 255 / 11%);
+  --input: rgb(255 255 255 / 11%);
+  --ring: #3333ff;
+  --chart-1: #3333ff;
+  --chart-2: #00cc7e;
+  --chart-3: #ffc51a;
+  --chart-4: #ff7059;
+  --chart-5: #8a6df1;
+  --sidebar: #20242a;
+  --sidebar-foreground: #f7f8fa;
+  --sidebar-primary: #3333ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #262b31;
+  --sidebar-accent-foreground: #f7f8fa;
+  --sidebar-border: rgb(255 255 255 / 11%);
+  --sidebar-ring: #3333ff;
 }
 
 @layer base {
@@ -186,9 +197,18 @@
   background: var(--dh-gray-ui);
 }
 
+.dark .dh-workspace {
+  background: #14171b;
+}
+
 .dh-panel {
   background: var(--dh-gray-ui);
   border-color: var(--dh-border);
+}
+
+.dark .dh-panel {
+  background: #1c2025;
+  border-color: rgb(255 255 255 / 11%);
 }
 
 .dh-toolbar {
@@ -196,10 +216,19 @@
   border-color: var(--dh-border);
 }
 
+.dark .dh-toolbar {
+  background: #1d2127;
+  border-color: rgb(255 255 255 / 11%);
+}
+
 .dh-canvas {
   background: var(--dh-white);
   border-color: var(--dh-border);
   box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.dark .dh-canvas {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 24%);
 }
 
 .dh-widget {
@@ -209,12 +238,18 @@
   box-shadow: 0 1px 2px rgb(0 0 0 / 7%);
 }
 
+.dark .dh-widget {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 24%);
+}
+
 [data-slot="input"],
 [data-slot="select-trigger"],
-[data-slot="textarea"] {
+[data-slot="textarea"],
+[data-slot="input-group"] {
   border-color: var(--dh-border);
   border-radius: 6px;
-  background: var(--dh-white);
+  background: var(--card);
+  color: var(--foreground);
 }
 
 [data-slot="input"]:focus-visible,
@@ -232,4 +267,31 @@
 [data-slot="table-head"] {
   font-family: var(--font-heading);
   color: var(--dh-gray-900);
+}
+
+.dark [data-slot="input"],
+.dark [data-slot="select-trigger"],
+.dark [data-slot="textarea"],
+.dark [data-slot="input-group"] {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  color-scheme: dark;
+}
+
+.dark [data-slot="input"]::placeholder,
+.dark [data-slot="textarea"]::placeholder {
+  color: var(--muted-foreground);
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark textarea:-webkit-autofill:hover,
+.dark textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--foreground);
+  -webkit-box-shadow: 0 0 0 1000px var(--card) inset;
+  box-shadow: 0 0 0 1000px var(--card) inset;
+  caret-color: var(--foreground);
+  transition: background-color 9999s ease-out 0s;
 }

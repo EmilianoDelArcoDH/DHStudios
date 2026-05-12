@@ -61,7 +61,7 @@ export function HomeScreen() {
               Creá y abrí reportes visuales con un projectId único. La estructura se mantiene familiar para estudiantes que ya conocen herramientas BI visuales.
             </p>
           </div>
-          <Card className="rounded-md border-[var(--dh-border)] bg-white shadow-sm">
+          <Card className="rounded-md border-[var(--dh-border)] bg-card shadow-sm">
             <CardHeader><CardTitle className="text-lg">Proyectos</CardTitle></CardHeader>
             <CardContent className="space-y-5">
               <Button className="w-full" onClick={() => void createProject()} disabled={loading !== null}>

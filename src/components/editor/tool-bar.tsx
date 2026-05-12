@@ -87,7 +87,7 @@ export function ToolBar() {
       <Button variant="ghost" size="sm" onClick={() => addWidget("text")}><Type className="mr-2 h-4 w-4" />Texto</Button>
       <Button variant="ghost" size="sm" onClick={() => addWidget("image")}><ImageIcon className="mr-2 h-4 w-4" />Imagen</Button>
       <Button variant="ghost" size="sm" onClick={() => addWidget("kpi")}><TextCursorInput className="mr-2 h-4 w-4" />KPI</Button>
-      <div className="ml-auto flex shrink-0 items-center gap-2 text-xs text-[var(--dh-gray-700)]">
+      <div className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
         Zoom
         <input className="accent-[var(--dh-blue)]" type="range" min="0.55" max="1.4" step="0.05" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} />
         {Math.round(zoom * 100)}%
