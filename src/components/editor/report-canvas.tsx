@@ -93,7 +93,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
         }}
       >
         {page.widgets.length === 0 ? (
-          <div className="flex h-[720px] items-center justify-center text-sm text-muted-foreground">Agregá gráficos, controles o texto desde la barra superior.</div>
+          <div className="flex h-[720px] items-center justify-center text-sm text-muted-foreground" style={{color:'black'}}>Agregá gráficos, controles o texto desde la barra superior.</div>
         ) : (
           <div className="relative min-h-[920px]">
           <SmartGuideOverlay guides={smartGuides} />
@@ -280,7 +280,7 @@ function WidgetFloatingToolbar({
   };
 
   return (
-    <div className="widget-no-drag absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md border border-[var(--dh-border)] bg-card/95 p-1 shadow-md">
+    <div className="widget-no-drag absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md border border-[var(--dh-border)] bg-card/95 p-1 text-foreground shadow-md">
       <ToolbarButton label="Duplicar widget" onClick={(event) => stopAndRun(event, onDuplicate)}>
         <Copy className="h-3.5 w-3.5" />
       </ToolbarButton>
@@ -318,7 +318,7 @@ function ToolbarButton({
       aria-label={label}
       variant={destructive ? "destructive" : "ghost"}
       size="icon-sm"
-      className="h-7 w-7"
+      className={cn("h-7 w-7", !destructive && "text-foreground")}
       onClick={onClick}
     >
       {children}
