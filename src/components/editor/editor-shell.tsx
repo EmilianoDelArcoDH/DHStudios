@@ -28,6 +28,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const isPreview = editorMode === "preview";
+  const isPresentationMode = readonly || isPreview;
 
   useEffect(() => {
     let active = true;
@@ -110,7 +111,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      {isPreview ? (
+      {readonly ? null : isPreview ? (
         <header className="dh-toolbar flex h-12 shrink-0 items-center gap-2 border-b px-3">
           <Eye className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold">Preview</span>
@@ -132,7 +133,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
           </Button>
         </div>
       ) : null}
-      {error && !isPreview ? <div className="border-b bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div> : null}
+      {error && !isPresentationMode ? <div className="border-b bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div> : null}
       <div className="relative flex min-h-0 flex-1">
         {!readonly && !isPreview ? (
           <div
@@ -170,7 +171,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
             </Button>
           ) : null}
           {!readonly && !isPreview ? <div className="hidden border-b bg-card p-2 xl:block"><AuthPanel /></div> : null}
-          <ReportCanvas preview={isPreview} />
+          <ReportCanvas preview={isPresentationMode} />
         </div>
         {!readonly && !isPreview ? (
           <div

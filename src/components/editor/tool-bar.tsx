@@ -65,7 +65,7 @@ export function ToolBar() {
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={() => addWidget("control_text")}>
+          {/* <DropdownMenuItem onClick={() => addWidget("control_text")}>
             Control
           </DropdownMenuItem>
 
@@ -79,7 +79,7 @@ export function ToolBar() {
 
           <DropdownMenuItem onClick={() => addWidget("kpi")}>
             KPI
-          </DropdownMenuItem>
+          </DropdownMenuItem> */}
         </DropdownMenuContent>
       </DropdownMenu>
       <Separator orientation="vertical" className="mx-1 h-6" />
