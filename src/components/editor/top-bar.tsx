@@ -1,20 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Download, Eye, FileJson, Redo2, Save, Share2, Undo2 } from "lucide-react";
+import { Check, Copy, Download, Eye, FileJson, MoreHorizontal, Redo2, Save, Share2, Undo2 } from "lucide-react";
 import { EditorSettingsSheet } from "@/components/editor/editor-settings-sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEditorStore } from "@/store/editor-store";
 import { exportReport, importReport } from "@/lib/report-io";
 import { reportService } from "@/services/report-service";
 
 const APPEARANCE_STORAGE_KEY = "dhstudios.appearance";
 
-export function TopBar({ readonly = false }: { readonly?: boolean }) {
-  const { report, mode, loading, updateReport, setMode, undo, redo, autosave, setReport } = useEditorStore();
+export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; onPreview?: () => void }) {
+  const {
+    report,
+    mode,
+    loading,
+    selectedWidgetId,
+    updateReport,
+    setMode,
+    undo,
+    redo,
+    autosave,
+    setReport,
+    addPage,
+    addWidget,
+    bringWidgetToFront,
+    sendWidgetToBack,
+    toggleWidgetLocked,
+  } = useEditorStore();
   const [shareOpen, setShareOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "sharing" | "copied" | "error">("idle");
   const [darkMode, setDarkMode] = useState(() => {
@@ -32,6 +49,34 @@ export function TopBar({ readonly = false }: { readonly?: boolean }) {
     const timeout = window.setTimeout(() => setShareState("idle"), 2200);
     return () => window.clearTimeout(timeout);
   }, [shareState]);
+
+  useEffect(() => {
+    if (readonly) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (isEditableTarget(event.target)) return;
+
+      const key = event.key.toLowerCase();
+      if (key === "z" && !event.shiftKey) {
+        event.preventDefault();
+        undo();
+      }
+
+      if (key === "y" || (key === "z" && event.shiftKey)) {
+        event.preventDefault();
+        redo();
+      }
+
+      if (key === "s") {
+        event.preventDefault();
+        void autosave();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [autosave, readonly, redo, undo]);
 
   const handleDarkModeChange = (checked: boolean) => {
     setDarkMode(checked);
@@ -86,16 +131,70 @@ export function TopBar({ readonly = false }: { readonly?: boolean }) {
 
   return (
     <>
-      <header className="dh-toolbar flex h-12 shrink-0 items-center gap-2 border-b px-3">
-        <Input value={report.name} onChange={(event) => updateReport({ name: event.target.value })} disabled={readonly} className="h-8 w-72 border-transparent bg-card text-base font-semibold shadow-none" />
-        <span className="rounded-sm border border-[var(--dh-border)] bg-card px-2 py-1 font-mono text-xs text-muted-foreground">{report.projectId}</span>
-        <div className="ml-auto flex items-center gap-1">
-          {!readonly ? <EditorSettingsSheet darkMode={darkMode} onDarkModeChange={handleDarkModeChange} /> : null}
-          {!readonly ? <ToolButton label="Deshacer" onClick={undo}><Undo2 className="h-4 w-4" /></ToolButton> : null}
-          {!readonly ? <ToolButton label="Rehacer" onClick={redo}><Redo2 className="h-4 w-4" /></ToolButton> : null}
-          {!readonly ? <ToolButton label="Guardar" onClick={() => void autosave()}><Save className="h-4 w-4" /></ToolButton> : null}
+      <header className="dh-toolbar flex h-16 shrink-0 items-center gap-3 border-b px-4">
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <Input
+              value={report.name}
+              onChange={(event) => updateReport({ name: event.target.value })}
+              disabled={readonly}
+              className="h-6 w-full max-w-80 border-transparent bg-transparent px-0 text-base font-semibold shadow-none focus-visible:ring-0"
+            />
+            <span className="hidden truncate font-mono text-[11px] text-muted-foreground lg:inline">{report.projectId}</span>
+          </div>
+          {!readonly ? (
+            <TopMenu
+              onSave={() => void autosave()}
+              onDownload={download}
+              onUpload={upload}
+              onShare={() => void openShareDialog()}
+              onUndo={undo}
+              onRedo={redo}
+              onEdit={() => setMode("edit")}
+              onPreview={onPreview}
+              onAddPage={addPage}
+              onAddWidget={addWidget}
+              selectedWidgetId={selectedWidgetId}
+              onBringToFront={() => selectedWidgetId ? bringWidgetToFront(selectedWidgetId) : undefined}
+              onSendToBack={() => selectedWidgetId ? sendWidgetToBack(selectedWidgetId) : undefined}
+              onToggleLocked={() => selectedWidgetId ? toggleWidgetLocked(selectedWidgetId) : undefined}
+            />
+          ) : null}
+        </div>
+
+        {!readonly ? (
+          <div className="hidden items-center rounded-md border border-[var(--dh-border)] bg-background p-0.5 md:flex">
+            <ModeButton active={mode === "edit"} onClick={() => setMode("edit")}>Editar</ModeButton>
+            <ModeButton active={false} onClick={() => onPreview?.()}>Preview</ModeButton>
+          </div>
+        ) : (
+          <div className="hidden items-center rounded-md border border-[var(--dh-border)] bg-background p-0.5 md:flex">
+            <ModeButton active disabled onClick={() => undefined}>Ver</ModeButton>
+          </div>
+        )}
+
+        {!readonly ? (
+          <div className="hidden items-center gap-1 rounded-md border border-[var(--dh-border)] bg-background px-1 py-0.5 lg:flex">
+            <ToolButton label="Deshacer" shortcut="Ctrl Z" onClick={undo}><Undo2 className="h-4 w-4" /></ToolButton>
+            <ToolButton label="Rehacer" shortcut="Ctrl Y" onClick={redo}><Redo2 className="h-4 w-4" /></ToolButton>
+            <div className="mx-1 h-5 w-px bg-border" />
+            <TooltipButton label="Guardar" shortcut="Ctrl S">
+              <Button variant="ghost" size="sm" onClick={() => void autosave()}>
+                <Save className="mr-2 h-4 w-4" />
+                Guardar
+              </Button>
+            </TooltipButton>
+          </div>
+        ) : null}
+
+        <div className="hidden min-w-20 items-center gap-1 text-xs text-muted-foreground sm:flex">
+          <span className={loading ? "h-2 w-2 rounded-full bg-amber-500" : "h-2 w-2 rounded-full bg-emerald-500"} />
+          {loading ? "Guardando" : "Guardado"}
+        </div>
+
+        <div className="flex items-center gap-2">
           <Button
-            variant="ghost"
+            variant="default"
             size="sm"
             onClick={() => void openShareDialog()}
             disabled={shareState === "sharing"}
@@ -103,17 +202,42 @@ export function TopBar({ readonly = false }: { readonly?: boolean }) {
             <Share2 className="mr-2 h-4 w-4" />
             {shareState === "sharing" ? "Preparando..." : "Compartir"}
           </Button>
-          <Button variant="ghost" size="sm" onClick={download}><Download className="mr-2 h-4 w-4" />Informe</Button>
-          {!readonly ? <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-sm font-semibold hover:bg-accent">
-            <FileJson className="h-4 w-4" />
-            Importar
-            <input type="file" accept="application/json" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
-          </label> : null}
-          <div className="mx-2 h-6 w-px bg-border" />
-          <Eye className="h-4 w-4 text-muted-foreground" />
-          <Switch checked={!readonly && mode === "edit"} disabled={readonly} onCheckedChange={(checked) => setMode(checked ? "edit" : "view")} />
-          <span className="w-16 text-xs text-muted-foreground">{readonly || mode === "view" ? "Ver" : "Editar"}</span>
-          <span className="w-24 text-xs text-muted-foreground">{loading ? "Guardando..." : "Guardado"}</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="outline" size="icon-sm" title="Mas acciones" aria-label="Mas acciones" />}>
+              <MoreHorizontal className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                {!readonly ? (
+                  <DropdownMenuItem onClick={() => void autosave()}>
+                    <Save className="h-4 w-4" />
+                    Guardar ahora
+                  </DropdownMenuItem>
+                ) : null}
+                {!readonly && onPreview ? (
+                  <DropdownMenuItem className="md:hidden" onClick={onPreview}>
+                    <Eye className="h-4 w-4" />
+                    Preview
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem onClick={download}>
+                  <Download className="h-4 w-4" />
+                  Descargar
+                </DropdownMenuItem>
+                {!readonly ? (
+                  <DropdownMenuItem>
+                    <label className="flex w-full cursor-pointer items-center gap-1.5">
+                      <FileJson className="h-4 w-4" />
+                      Importar
+                      <input type="file" accept="application/json" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
+                    </label>
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {!readonly ? <EditorSettingsSheet darkMode={darkMode} onDarkModeChange={handleDarkModeChange} /> : null}
         </div>
       </header>
 
@@ -157,6 +281,177 @@ export function TopBar({ readonly = false }: { readonly?: boolean }) {
   );
 }
 
-function ToolButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
-  return <Button title={label} aria-label={label} variant="ghost" size="icon" onClick={onClick} className="h-8 w-8">{children}</Button>;
+function TopMenu({
+  onSave,
+  onDownload,
+  onUpload,
+  onShare,
+  onUndo,
+  onRedo,
+  onEdit,
+  onPreview,
+  onAddPage,
+  onAddWidget,
+  selectedWidgetId,
+  onBringToFront,
+  onSendToBack,
+  onToggleLocked,
+}: {
+  onSave: () => void;
+  onDownload: () => void;
+  onUpload: (file?: File) => void | Promise<void>;
+  onShare: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  onEdit: () => void;
+  onPreview?: () => void;
+  onAddPage: () => void;
+  onAddWidget: ReturnType<typeof useEditorStore.getState>["addWidget"];
+  selectedWidgetId?: string;
+  onBringToFront: () => void;
+  onSendToBack: () => void;
+  onToggleLocked: () => void;
+}) {
+  const hasSelection = Boolean(selectedWidgetId);
+
+  return (
+    <nav className="flex items-center gap-1 text-sm">
+      <MenuRoot label="Archivo">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Informe</DropdownMenuLabel>
+          <DropdownMenuItem onClick={onSave}>Guardar</DropdownMenuItem>
+          <DropdownMenuItem onClick={onShare}>Compartir</DropdownMenuItem>
+          <DropdownMenuItem onClick={onDownload}>Descargar</DropdownMenuItem>
+          <DropdownMenuItem>
+            <label className="flex w-full cursor-pointer items-center gap-1.5">
+              Importar
+              <input type="file" accept="application/json" className="hidden" onChange={(event) => void onUpload(event.target.files?.[0])} />
+            </label>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </MenuRoot>
+
+      <MenuRoot label="Editar">
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={onUndo}>Deshacer <span className="ml-auto font-mono text-xs text-muted-foreground">Ctrl Z</span></DropdownMenuItem>
+          <DropdownMenuItem onClick={onRedo}>Rehacer <span className="ml-auto font-mono text-xs text-muted-foreground">Ctrl Y</span></DropdownMenuItem>
+        </DropdownMenuGroup>
+      </MenuRoot>
+
+      <MenuRoot label="Vista">
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={onEdit}>Modo editar</DropdownMenuItem>
+          <DropdownMenuItem onClick={onPreview} disabled={!onPreview}>Preview</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </MenuRoot>
+
+      <MenuRoot label="Insertar">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Graficos</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => onAddWidget("bar")}>Grafico de barras</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddWidget("line")}>Grafico de lineas</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddWidget("pie")}>Grafico de torta</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddWidget("table")}>Tabla</DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Contenido</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => onAddWidget("kpi")}>KPI</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddWidget("text")}>Texto</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddWidget("image")}>Imagen</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddWidget("control_text")}>Control</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </MenuRoot>
+
+      <MenuRoot label="Pagina">
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={onAddPage}>Añadir pagina</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </MenuRoot>
+
+      <MenuRoot label="Organizar">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Widget seleccionado</DropdownMenuLabel>
+          <DropdownMenuItem onClick={onBringToFront} disabled={!hasSelection}>Traer al frente</DropdownMenuItem>
+          <DropdownMenuItem onClick={onSendToBack} disabled={!hasSelection}>Enviar atras</DropdownMenuItem>
+          <DropdownMenuItem onClick={onToggleLocked} disabled={!hasSelection}>Bloquear / desbloquear</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </MenuRoot>
+
+      <MenuRoot label="Recurso">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Datos</DropdownMenuLabel>
+          <DropdownMenuItem disabled>Gestiona fuentes desde Datos</DropdownMenuItem>
+          <DropdownMenuItem disabled>Combinar datos</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </MenuRoot>
+
+      <MenuRoot label="Ayuda">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Atajos</DropdownMenuLabel>
+          <DropdownMenuItem disabled>Guardar: Ctrl S</DropdownMenuItem>
+          <DropdownMenuItem disabled>Deshacer: Ctrl Z</DropdownMenuItem>
+          <DropdownMenuItem disabled>Rehacer: Ctrl Y</DropdownMenuItem>
+        </DropdownMenuGroup>
+      </MenuRoot>
+    </nav>
+  );
+}
+
+function MenuRoot({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<button type="button" className="rounded-sm px-2 py-0.5 text-sm text-foreground hover:bg-muted" />}>
+        {label}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ToolButton({ label, shortcut, onClick, children }: { label: string; shortcut: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <TooltipButton label={label} shortcut={shortcut}>
+      <Button title={label} aria-label={label} variant="ghost" size="icon-sm" onClick={onClick}>{children}</Button>
+    </TooltipButton>
+  );
+}
+
+function TooltipButton({ label, shortcut, children }: { label: string; shortcut: string; children: React.ReactNode }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger render={<span className="inline-flex" />}>
+          {children}
+        </TooltipTrigger>
+        <TooltipContent>
+          <span>{label}</span>
+          <kbd data-slot="kbd" className="bg-background/15 px-1 py-0.5 font-mono text-[10px]">{shortcut}</kbd>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function ModeButton({ active, disabled, onClick, children }: { active: boolean; disabled?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <Button
+      type="button"
+      variant={active ? "secondary" : "ghost"}
+      size="sm"
+      disabled={disabled}
+      className="h-6 px-2 text-xs"
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
 }

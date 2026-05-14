@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BringToFront, Copy, Lock, SendToBack, Trash2, Unlock } from "lucide-react";
+import { BarChart3, BringToFront, Copy, Lock, MoreHorizontal, Plus, SendToBack, Trash2, Unlock } from "lucide-react";
 import { getCompactor, GridLayout, type Layout, type LayoutItem } from "react-grid-layout";
 import { useEditorStore } from "@/store/editor-store";
 import { ChartRenderer } from "@/components/charts/chart-renderer";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { ReportWidget } from "@/types";
+import type { ReportWidget, WidgetFilter } from "@/types";
 
 const fixedGridCompactor = getCompactor(null, false, true);
 const gridConfig = { cols: 12, rowHeight: 42, margin: [12, 12] as const, containerPadding: [12, 12] as const };
@@ -23,6 +24,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
     selectedWidgetId,
     mode,
     zoom,
+    controlValues,
     selectWidget,
     updateWidgetLayouts,
     duplicateWidget,
@@ -30,6 +32,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
     toggleWidgetLocked,
     bringWidgetToFront,
     sendWidgetToBack,
+    addWidget,
   } = useEditorStore();
   const [smartGuides, setSmartGuides] = useState<SmartGuide[]>([]);
   const page = report.pages.find((item) => item.id === activePageId) ?? report.pages[0];
@@ -93,7 +96,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
         }}
       >
         {page.widgets.length === 0 ? (
-          <div className="flex h-[720px] items-center justify-center text-sm text-muted-foreground" style={{color:'black'}}>Agregá gráficos, controles o texto desde la barra superior.</div>
+          <EmptyCanvas onAddChart={() => addWidget("bar")} />
         ) : (
           <div className="relative min-h-[920px]">
           <SmartGuideOverlay guides={smartGuides} />
@@ -112,6 +115,9 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
             {page.widgets.map((widget, index) => {
               const dataset = report.datasets.find((item) => item.id === widget.config.datasetId);
               const selected = !preview && selectedWidgetId === widget.id && mode === "edit";
+              const globalFilters = filtersForWidget(widget, page.widgets, controlValues);
+              const showTitle = widget.style.showTitle ?? widget.type !== "image";
+              const hasCanvasTitle = showTitle && widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type);
               return (
                 <section
                   key={widget.id}
@@ -138,9 +144,9 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
                       {widget.locked ? "bloqueado" : "mover"}
                     </div>
                   ) : null}
-                  {widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type) ? <div className="widget-no-drag h-8 px-3 pt-2 text-sm font-semibold">{widget.style.title}</div> : null}
-                  <div className={cn("widget-no-drag h-full", mode === "edit" && "h-[calc(100%-1.25rem)]", widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type) && "h-[calc(100%-2rem)]", mode === "edit" && widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type) && "h-[calc(100%-3.25rem)]")}>
-                      <ChartRenderer widget={widget} dataset={dataset} datasets={report.datasets} dataModel={report.dataModel} />
+                  {hasCanvasTitle ? <div className="widget-no-drag h-8 px-3 pt-2 text-sm font-semibold">{widget.style.title}</div> : null}
+                  <div className={cn("widget-no-drag h-full", mode === "edit" && "h-[calc(100%-1.25rem)]", hasCanvasTitle && "h-[calc(100%-2rem)]", mode === "edit" && hasCanvasTitle && "h-[calc(100%-3.25rem)]")}>
+                      <ChartRenderer widget={widget} dataset={dataset} datasets={report.datasets} dataModel={report.dataModel} globalFilters={globalFilters} />
                   </div>
                 </section>
               );
@@ -150,6 +156,55 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
         )}
       </div>
     </main>
+  );
+}
+
+function filtersForWidget(widget: ReportWidget, widgets: ReportWidget[], controlValues: Record<string, string | [string, string] | undefined>): WidgetFilter[] {
+  if (widget.type.startsWith("control") || !widget.config.datasetId) return [];
+
+  return widgets.flatMap<WidgetFilter>((control) => {
+    if (!control.type.startsWith("control")) return [];
+    if (control.config.datasetId !== widget.config.datasetId || !control.config.dimension) return [];
+    const value = controlValues[control.id];
+    if (!value) return [];
+
+    if (control.type === "control_date") {
+      if (!Array.isArray(value) || !value[0] || !value[1]) return [];
+      return [{ column: control.config.dimension, operator: "between", value }];
+    }
+
+    if (Array.isArray(value) || String(value).trim() === "") return [];
+    return [{
+      column: control.config.dimension,
+      operator: control.type === "control_select" ? "equals" : "contains",
+      value,
+    }];
+  });
+}
+
+function EmptyCanvas({ onAddChart }: { onAddChart: () => void }) {
+  return (
+    <div className="flex h-[720px] items-center justify-center px-8 text-center">
+      <div className="max-w-sm rounded-md border border-dashed border-[var(--dh-border)] bg-background/85 p-6 shadow-sm">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <BarChart3 className="h-6 w-6" />
+        </div>
+        <h2 className="text-base font-semibold">Empeza tu informe</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Agrega un grafico al canvas y despues conectalo con una fuente de datos desde el panel de propiedades.
+        </p>
+        <Button
+          className="mt-4"
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddChart();
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Agregar primer grafico
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -274,54 +329,52 @@ function WidgetFloatingToolbar({
   onBringToFront: () => void;
   onSendToBack: () => void;
 }) {
-  const stopAndRun = (event: React.MouseEvent, action: () => void) => {
+  const stopAndRun = (event: { stopPropagation: () => void }, action: () => void) => {
     event.stopPropagation();
     action();
   };
 
   return (
-    <div className="widget-no-drag absolute right-2 top-2 z-20 flex items-center gap-1 rounded-md border border-[var(--dh-border)] bg-card/95 p-1 text-foreground shadow-md">
-      <ToolbarButton label="Duplicar widget" onClick={(event) => stopAndRun(event, onDuplicate)}>
-        <Copy className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton label={widget.locked ? "Desbloquear widget" : "Bloquear widget"} onClick={(event) => stopAndRun(event, onToggleLocked)}>
-        {widget.locked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
-      </ToolbarButton>
-      <ToolbarButton label="Traer al frente" onClick={(event) => stopAndRun(event, onBringToFront)}>
-        <BringToFront className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton label="Enviar atras" onClick={(event) => stopAndRun(event, onSendToBack)}>
-        <SendToBack className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton label="Eliminar widget" destructive onClick={(event) => stopAndRun(event, onRemove)}>
-        <Trash2 className="h-3.5 w-3.5" />
-      </ToolbarButton>
-    </div>
-  );
-}
-
-function ToolbarButton({
-  label,
-  destructive = false,
-  onClick,
-  children,
-}: {
-  label: string;
-  destructive?: boolean;
-  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Button
-      type="button"
-      title={label}
-      aria-label={label}
-      variant={destructive ? "destructive" : "ghost"}
-      size="icon-sm"
-      className={cn("h-7 w-7", !destructive && "text-foreground")}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            title="Acciones del widget"
+            aria-label="Acciones del widget"
+            variant="outline"
+            size="icon-sm"
+            className="widget-no-drag absolute right-2 top-2 z-20 bg-card/95 shadow-md"
+            onClick={(event) => event.stopPropagation()}
+          />
+        }
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={(event) => stopAndRun(event, onDuplicate)}>
+            <Copy className="h-4 w-4" />
+            Duplicar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={(event) => stopAndRun(event, onToggleLocked)}>
+            {widget.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+            {widget.locked ? "Desbloquear" : "Bloquear"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={(event) => stopAndRun(event, onBringToFront)}>
+            <BringToFront className="h-4 w-4" />
+            Traer al frente
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={(event) => stopAndRun(event, onSendToBack)}>
+            <SendToBack className="h-4 w-4" />
+            Enviar atras
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={(event) => stopAndRun(event, onRemove)}>
+            <Trash2 className="h-4 w-4" />
+            Eliminar
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

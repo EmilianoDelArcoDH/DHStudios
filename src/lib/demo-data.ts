@@ -62,6 +62,7 @@ function widget(type: WidgetType, projectId: string, pageId: string, x: number, 
     },
     style: {
       title,
+      showTitle: true,
       fontFamily: "Geist",
       fontSize: 13,
       color: "#1f2937",

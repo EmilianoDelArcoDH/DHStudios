@@ -7,6 +7,7 @@ import { ensureDatasetConfig } from "@/lib/dataset";
 import { reportService } from "@/services/report-service";
 
 type Snapshot = Report;
+type ControlValue = string | [string, string] | undefined;
 
 type EditorState = {
   report: Report;
@@ -16,6 +17,7 @@ type EditorState = {
   zoom: number;
   loading: boolean;
   error?: string;
+  controlValues: Record<string, ControlValue>;
   past: Snapshot[];
   future: Snapshot[];
   setReport: (report: Report) => void;
@@ -23,6 +25,7 @@ type EditorState = {
   setZoom: (zoom: number) => void;
   selectPage: (pageId: string) => void;
   selectWidget: (widgetId?: string) => void;
+  setControlValue: (widgetId: string, value: ControlValue) => void;
   updateReport: (patch: Partial<Omit<Report, "projectId">>) => void;
   addPage: () => void;
   updatePage: (pageId: string, patch: Partial<ReportPage>) => void;
@@ -149,6 +152,7 @@ function defaultWidget(type: WidgetType, projectId: string, pageId: string, data
     },
     style: {
       title: isText ? "Texto" : "Nuevo componente",
+      showTitle: type !== "image",
       text: isText ? "Escribí un texto para el informe" : undefined,
       fontFamily: "Geist",
       fontSize: 13,
@@ -177,16 +181,18 @@ export const useEditorStore = create<EditorState>((set, get) => {
     report: initial,
     activePageId: initial.pages[0].id,
     mode: "edit",
-    zoom: 0.92,
+    zoom: 1,
     loading: false,
+    controlValues: {},
     past: [],
     future: [],
 
     setReport: (report) => set({ report: normalizeReportDatasets(report), activePageId: report.pages[0]?.id, selectedWidgetId: undefined, past: [], future: [] }),
     setMode: (mode) => set({ mode }),
-    setZoom: (zoom) => set({ zoom: Math.min(1.4, Math.max(0.55, zoom)) }),
+    setZoom: (zoom) => set({ zoom: Math.min(1.25, Math.max(0.5, zoom)) }),
     selectPage: (pageId) => set({ activePageId: pageId, selectedWidgetId: undefined }),
     selectWidget: (widgetId) => set({ selectedWidgetId: widgetId }),
+    setControlValue: (widgetId, value) => set((state) => ({ controlValues: { ...state.controlValues, [widgetId]: value } })),
 
     updateReport: (patch) =>
       set((state) => withHistory(state, { ...state.report, ...patch, updatedAt: timestamp() })),

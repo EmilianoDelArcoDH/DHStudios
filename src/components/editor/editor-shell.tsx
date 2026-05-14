@@ -127,17 +127,13 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
           </Button>
         </header>
       ) : (
-        <TopBar readonly={readonly} />
+        <TopBar readonly={readonly} onPreview={enterPreview} />
       )}
-      {!readonly && !isPreview ? <ToolBar /> : null}
-      {!readonly && !isPreview ? (
-        <div className="border-b bg-card px-3 py-2">
-          <Button variant="outline" size="sm" onClick={enterPreview}>
-            <Eye className="mr-2 h-4 w-4" />
-            Preview
-          </Button>
-        </div>
-      ) : null}
+      {!readonly && !isPreview ? <ToolBar onAddData={() => {
+        setManagedDatasetId(undefined);
+        setEditorView("data-sources");
+        selectWidget(undefined);
+      }} /> : null}
       {error && !isPresentationMode ? <div className="border-b bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div> : null}
       <div className="relative flex min-h-0 flex-1">
         {!readonly && !isPreview ? (

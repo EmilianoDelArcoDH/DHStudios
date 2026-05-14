@@ -102,7 +102,9 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
   const isPie = pieTypes.has(widget.type);
   const isCartesian = cartesianTypes.has(widget.type);
   const isTable = tableTypes.has(widget.type);
-  const showDataSource = isScore || isScatter || isPie || isCartesian || isTable;
+  const isControl = widget.type.startsWith("control");
+  const showDataSource = isScore || isScatter || isPie || isCartesian || isTable || isControl;
+  const controlColumns = widget.type === "control_date" ? columns.filter((column) => column.type === "date") : columns;
 
   const setSingleDimension = (dimension?: string) => setConfig({ dimension, dimensions: dimension ? [dimension] : [] });
   const suggestedAggregation = (metric?: string) => aggregationOrFallback(metricColumns.find((column) => column.name === metric)?.defaultAggregation, widget.config.aggregation);
@@ -143,13 +145,18 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           {isText ? (
             <>
+              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
               <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
               <Field label="Texto"><Input value={widget.style.text ?? ""} onChange={(event) => setStyle({ text: event.target.value })} /></Field>
             </>
           ) : null}
 
           {isImage ? (
-            <Field label="URL de imagen"><Input value={widget.style.imageUrl ?? ""} onChange={(event) => setStyle({ imageUrl: event.target.value })} /></Field>
+            <>
+              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? false} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
+              <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
+              <Field label="URL de imagen"><Input value={widget.style.imageUrl ?? ""} onChange={(event) => setStyle({ imageUrl: event.target.value })} /></Field>
+            </>
           ) : null}
 
           {showDataSource ? (
@@ -166,8 +173,17 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
             </Field>
           ) : null}
 
+          {isControl ? (
+            <>
+              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
+              <SingleColumnSelect label="Campo de filtro" value={widget.config.dimension} columns={controlColumns} onChange={setSingleDimension} />
+              <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
+            </>
+          ) : null}
+
           {isScore ? (
             <>
+              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
               <SingleColumnSelect label="Metrica" value={widget.config.metric} columns={metricColumns} onChange={setSingleMetric} />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
               <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
@@ -235,7 +251,10 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
         <TabsContent value="estilo" className="h-0 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-4">
           {!isText && !isImage && !isScore ? (
-            <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
+            <>
+              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
+              <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
+            </>
           ) : null}
 
           <BasicStyleControls style={widget.style} setStyle={setStyle} compact={isImage} />

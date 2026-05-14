@@ -3,10 +3,14 @@
 import dynamic from "next/dynamic";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
-import type { ChartConfig, ColumnFormat, Dataset, DatasetColumnConfig, DatasetRow, ReportWidget, WidgetMetric } from "@/types";
+import type { ChartConfig, ColumnFormat, Dataset, DatasetColumnConfig, DatasetRow, ReportWidget, WidgetFilter, WidgetMetric } from "@/types";
 import { aggregate, applyCalculatedFields, applyFilters, getDatasetColumnConfig, getVisibleDatasetColumns } from "@/lib/dataset";
 import { executeWidgetQuery, queryFieldFromKey } from "@/lib/data-model/query";
 import type { DataModel } from "@/lib/data-model/types";
+import { useEditorStore } from "@/store/editor-store";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), {
@@ -19,6 +23,7 @@ type Props = {
   dataset?: Dataset;
   datasets?: Dataset[];
   dataModel?: DataModel;
+  globalFilters?: WidgetFilter[];
 };
 
 const defaultColors = ["#3333ff", "#00cc7e", "#ffc51a", "#ff7059", "#8a6df1", "#ff76e2"];
@@ -125,10 +130,11 @@ function buildModelChartData(datasets: Dataset[] | undefined, dataModel: DataMod
   );
 }
 
-function ChartRendererBase({ widget, dataset, datasets, dataModel }: Props) {
+function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters = [] }: Props) {
+  const effectiveConfig = useMemo(() => ({ ...widget.config, globalFilters }), [globalFilters, widget.config]);
   const chartData = useMemo(
-    () => buildModelChartData(datasets, dataModel, widget.config) ?? buildChartData(dataset, widget.config),
-    [dataModel, dataset, datasets, widget.config],
+    () => buildModelChartData(datasets, dataModel, effectiveConfig) ?? buildChartData(dataset, effectiveConfig),
+    [dataModel, dataset, datasets, effectiveConfig],
   );
   const option = useMemo(
     () => {
@@ -247,7 +253,7 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel }: Props) {
   }
 
   if (widget.type.startsWith("control")) {
-    return <EmptyWidget label={widget.type === "control_date" ? "Control de fecha" : widget.type === "control_select" ? "Selector" : "Filtro de texto"} />;
+    return <ControlWidget widget={widget} dataset={dataset} />;
   }
 
   if (!dataset) return <EmptyWidget label="Seleccioná una fuente de datos" />;
@@ -268,9 +274,10 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel }: Props) {
   if (widget.type === "kpi" || widget.type === "scorecard") {
     const value = chartData.series[0]?.data[0] ?? 0;
     const metricConfig = getDatasetColumnConfig(dataset).find((column) => column.name === widget.config.metric);
+    const showTitle = widget.style.showTitle ?? true;
     return (
       <div className="flex h-full flex-col justify-center px-4">
-        <span className="text-xs text-muted-foreground">{widget.style.title}</span>
+        {showTitle ? <span className="text-xs text-muted-foreground">{widget.style.title}</span> : null}
         <strong className="font-mono text-3xl tracking-normal">{formatValue(value, metricConfig?.format)}</strong>
         <span className="text-xs text-muted-foreground">{widget.config.aggregation} de {metricConfig?.label ?? widget.config.metric ?? "registros"}</span>
       </div>
@@ -364,6 +371,64 @@ function DataTable({ rows, columnKeys, columnConfigs, limit }: { rows: DatasetRo
 function readableColumnName(column: string) {
   const separator = column.indexOf(".");
   return separator === -1 ? column : column.slice(separator + 1);
+}
+
+function ControlWidget({ widget, dataset }: { widget: ReportWidget; dataset?: Dataset }) {
+  const value = useEditorStore((state) => state.controlValues[widget.id]);
+  const setControlValue = useEditorStore((state) => state.setControlValue);
+  const column = widget.config.dimension;
+  const label = dataset && column
+    ? getDatasetColumnConfig(dataset).find((item) => item.name === column)?.label ?? column
+    : "Campo";
+  const showTitle = widget.style.showTitle ?? true;
+
+  if (!dataset) return <EmptyWidget label="Selecciona una fuente de datos" />;
+  if (!column) return <EmptyWidget label="Selecciona un campo de filtro" />;
+
+  if (widget.type === "control_select") {
+    const options = uniqueColumnValues(dataset, column);
+    const selectedValue = typeof value === "string" ? value : "";
+    return (
+      <div className="flex h-full flex-col justify-center gap-2 p-3">
+        {showTitle ? <span className="text-xs font-medium text-muted-foreground">{widget.style.title || label}</span> : null}
+        <Select value={selectedValue || "__all__"} onValueChange={(next) => setControlValue(widget.id, !next || next === "__all__" ? undefined : next)}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Todos</SelectItem>
+            {options.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  if (widget.type === "control_date") {
+    const range = Array.isArray(value) ? value : ["", ""];
+    return (
+      <div className="flex h-full flex-col justify-center gap-2 p-3">
+        {showTitle ? <span className="text-xs font-medium text-muted-foreground">{widget.style.title || label}</span> : null}
+        <div className="grid grid-cols-2 gap-2">
+          <Input type="date" value={range[0]} onChange={(event) => setControlValue(widget.id, [event.target.value, range[1]])} />
+          <Input type="date" value={range[1]} onChange={(event) => setControlValue(widget.id, [range[0], event.target.value])} />
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => setControlValue(widget.id, undefined)}>Limpiar</Button>
+      </div>
+    );
+  }
+
+  const textValue = typeof value === "string" ? value : "";
+  return (
+    <div className="flex h-full flex-col justify-center gap-2 p-3">
+      {showTitle ? <span className="text-xs font-medium text-muted-foreground">{widget.style.title || label}</span> : null}
+      <Input value={textValue} onChange={(event) => setControlValue(widget.id, event.target.value ? event.target.value : undefined)} placeholder="Filtrar..." />
+    </div>
+  );
+}
+
+function uniqueColumnValues(dataset: Dataset, column: string) {
+  return Array.from(new Set(dataset.rows.map((row) => row[column]).filter((value) => value !== null && value !== undefined && value !== "").map(String))).sort((a, b) => a.localeCompare(b));
 }
 
 function formatValue(value: unknown, format: ColumnFormat = "text") {

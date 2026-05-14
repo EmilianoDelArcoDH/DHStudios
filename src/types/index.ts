@@ -102,6 +102,7 @@ export type ChartConfig = {
 
 export type WidgetStyle = {
   title?: string;
+  showTitle?: boolean;
   fontFamily?: string;
   fontSize?: number;
   color?: string;
