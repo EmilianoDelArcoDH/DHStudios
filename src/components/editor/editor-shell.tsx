@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, PanelLeftOpen, PanelRightOpen, Pencil } from "lucide-react";
 import { AuthPanel } from "@/components/auth/auth-panel";
+import { DataSourceManager } from "@/components/datasources/data-source-manager";
 import { ReportCanvas } from "@/components/editor/report-canvas";
 import { ToolBar } from "@/components/editor/tool-bar";
 import { TopBar } from "@/components/editor/top-bar";
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 const PANEL_PREFS_KEY = "dhstudios.editor.panels";
 type EditorMode = "edit" | "preview";
+type EditorView = "canvas" | "data-sources";
 
 export function EditorShell({ projectId, readonly = false }: { projectId: string; readonly?: boolean }) {
   useAutosave();
@@ -24,6 +26,8 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
   const [loadState, setLoadState] = useState<"loading" | "ready" | "not-found" | "forbidden" | "error">("loading");
   const [loadError, setLoadError] = useState("");
   const [editorMode, setEditorMode] = useState<EditorMode>("edit");
+  const [editorView, setEditorView] = useState<EditorView>("canvas");
+  const [managedDatasetId, setManagedDatasetId] = useState<string | undefined>();
   const [panelPrefsLoaded, setPanelPrefsLoaded] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
@@ -90,6 +94,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
     selectWidget(undefined);
     setMode("view");
     setEditorMode("preview");
+    setEditorView("canvas");
   };
 
   const exitPreview = () => {
@@ -140,7 +145,14 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
             aria-hidden={leftPanelCollapsed}
             className={cn("shrink-0 overflow-hidden transition-[width] duration-200 ease-out", leftPanelCollapsed ? "w-0" : "w-64")}
           >
-            <LeftPanel onCollapse={() => setLeftPanelCollapsed(true)} />
+            <LeftPanel
+              onCollapse={() => setLeftPanelCollapsed(true)}
+              onManageDataset={(datasetId) => {
+                setManagedDatasetId(datasetId);
+                setEditorView("data-sources");
+                selectWidget(undefined);
+              }}
+            />
           </div>
         ) : null}
         <div className="relative flex min-w-0 flex-1 flex-col">
@@ -171,7 +183,11 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
             </Button>
           ) : null}
           {!readonly && !isPreview ? <div className="hidden border-b bg-card p-2 xl:block"><AuthPanel /></div> : null}
-          <ReportCanvas preview={isPresentationMode} />
+          {editorView === "data-sources" && !isPresentationMode ? (
+            <DataSourceManager key={managedDatasetId ?? "data-sources"} initialDatasetId={managedDatasetId} onClose={() => setEditorView("canvas")} />
+          ) : (
+            <ReportCanvas preview={isPresentationMode} />
+          )}
         </div>
         {!readonly && !isPreview ? (
           <div

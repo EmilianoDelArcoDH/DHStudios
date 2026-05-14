@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useEditorStore } from "@/store/editor-store";
-import type { Aggregation, ColumnType, Dataset, WidgetStyle, WidgetType } from "@/types";
+import type { Aggregation, ColumnType, Dataset, WidgetMetric, WidgetStyle, WidgetType } from "@/types";
+import { aggregationOrFallback, getDatasetColumnConfig, getVisibleDatasetColumns } from "@/lib/dataset";
 import { cn } from "@/lib/utils";
 import type { DataModel, DatasetRelationship } from "@/lib/data-model/types";
 
-const aggregations: Aggregation[] = ["sum", "avg", "count", "min", "max"];
+const aggregations: Aggregation[] = ["sum", "avg", "count", "countDistinct", "min", "max"];
 const EMPTY_SELECT_VALUE = "__none__";
 const defaultSeriesColors = ["#3333ff", "#00cc7e", "#ffc51a", "#ff7059", "#8a6df1", "#ff76e2"];
 
@@ -44,7 +45,11 @@ const tableTypes = new Set(tableChartTypes.map((item) => item.value));
 const scoreTypes = new Set(scoreChartTypes.map((item) => item.value));
 
 type ChartTypeOption = { value: WidgetType; label: string };
-type ColumnOption = { name: string; label?: string; type: ColumnType };
+type ColumnOption = { name: string; label?: string; type: ColumnType; defaultAggregation?: import("@/types").AggregationType };
+
+function metricKey(metric: string | WidgetMetric) {
+  return typeof metric === "string" ? metric : metric.column ?? metric.id;
+}
 
 function compatibleTypes(type: WidgetType) {
   if (cartesianTypes.has(type)) return cartesianChartTypes;
@@ -84,10 +89,10 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
   const setConfig = (patch: Partial<typeof widget.config>) => updateWidget(widget.id, { config: { ...widget.config, ...patch } });
   const setStyle = (patch: Partial<WidgetStyle>) => updateWidget(widget.id, { style: { ...widget.style, ...patch } });
-  const columns = dataset?.columns ?? [];
+  const columns = dataset ? getVisibleDatasetColumns(dataset) : [];
   const metricColumns = columns.filter((column) => column.type === "number");
   const dimensionColumns = getDimensionColumns(report.datasets, dataModel, widget.config.datasetId);
-  const selectedMetrics = widget.config.metrics ?? (widget.config.metric ? [widget.config.metric] : []);
+  const selectedMetrics = (widget.config.metrics ?? (widget.config.metric ? [widget.config.metric] : [])).map(metricKey);
   const seriesColors = widget.style.seriesColors?.length ? widget.style.seriesColors : defaultSeriesColors;
   const typeOptions = compatibleTypes(widget.type);
   const isText = widget.type === "text";
@@ -100,13 +105,14 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
   const showDataSource = isScore || isScatter || isPie || isCartesian || isTable;
 
   const setSingleDimension = (dimension?: string) => setConfig({ dimension, dimensions: dimension ? [dimension] : [] });
-  const setSingleMetric = (metric?: string) => setConfig({ metric, metrics: metric ? [metric] : [] });
+  const suggestedAggregation = (metric?: string) => aggregationOrFallback(metricColumns.find((column) => column.name === metric)?.defaultAggregation, widget.config.aggregation);
+  const setSingleMetric = (metric?: string) => setConfig({ metric, metrics: metric ? [metric] : [], aggregation: suggestedAggregation(metric) });
   const setScatterMetric = (index: number, metric?: string) => {
     const next = [...selectedMetrics];
     if (!metric) next.splice(index, 1);
     else next[index] = metric;
     const cleaned = next.filter(Boolean);
-    setConfig({ metric: cleaned[0], metrics: cleaned });
+    setConfig({ metric: cleaned[0], metrics: cleaned, aggregation: suggestedAggregation(cleaned[0]) });
   };
 
   return (
@@ -149,7 +155,9 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
           {showDataSource ? (
             <Field label="Fuente de datos">
               <Select value={widget.config.datasetId ?? EMPTY_SELECT_VALUE} onValueChange={(value) => setConfig({ datasetId: !value || value === EMPTY_SELECT_VALUE ? undefined : value })}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                <SelectTrigger className="w-full min-w-0">
+                  <span className="truncate text-left">{dataset?.name ?? "Seleccionar"}</span>
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={EMPTY_SELECT_VALUE}>Sin fuente</SelectItem>
                   {report.datasets.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
@@ -196,7 +204,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
                 values={selectedMetrics}
                 columns={metricColumns}
                 addLabel="Agregar metrica"
-                onChange={(metrics) => setConfig({ metrics, metric: metrics[0] })}
+                onChange={(metrics) => setConfig({ metrics, metric: metrics[0], aggregation: suggestedAggregation(metrics[0]) })}
               />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
               <Field label="Orden">
@@ -272,12 +280,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function getDimensionColumns(datasets: Dataset[], dataModel: DataModel, baseDatasetId?: string): ColumnOption[] {
   if (!baseDatasetId) return [];
   const baseDataset = datasets.find((dataset) => dataset.id === baseDatasetId);
-  const baseColumns = baseDataset?.columns.map((column) => ({ name: column.name, type: column.type })) ?? [];
+  const baseColumns = baseDataset ? getVisibleDatasetColumns(baseDataset).map((column) => ({
+    name: column.name,
+    label: column.label,
+    type: column.type,
+    defaultAggregation: column.defaultAggregation,
+  })) : [];
   const relatedColumns = relatedDatasetsForBase(datasets, dataModel, baseDatasetId).flatMap((relatedDataset) =>
-    relatedDataset.columns.map((column) => ({
+    getVisibleDatasetColumns(relatedDataset).map((column) => ({
       name: `${relatedDataset.id}.${column.name}`,
-      label: `${relatedDataset.name}.${column.name}`,
+      label: `${relatedDataset.name}.${column.label}`,
       type: column.type,
+      defaultAggregation: column.defaultAggregation,
     })),
   );
 
@@ -380,8 +394,8 @@ function DataModelControls({
 
               <div className="space-y-2 border-t border-[var(--dh-border)] pt-3">
                 <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">Campos de union</p>
-                <SingleColumnSelect label="ID en base" value={relationship.fromColumn} columns={fromDataset?.columns ?? []} onChange={(fromColumn) => updateRelationship(relationship.id, { fromColumn: fromColumn ?? "" })} />
-                <SingleColumnSelect label="ID relacionado" value={relationship.toColumn} columns={toDataset?.columns ?? []} onChange={(toColumn) => updateRelationship(relationship.id, { toColumn: toColumn ?? "" })} />
+                <SingleColumnSelect label="ID en base" value={relationship.fromColumn} columns={fromDataset ? getDatasetColumnConfig(fromDataset) : []} onChange={(fromColumn) => updateRelationship(relationship.id, { fromColumn: fromColumn ?? "" })} />
+                <SingleColumnSelect label="ID relacionado" value={relationship.toColumn} columns={toDataset ? getDatasetColumnConfig(toDataset) : []} onChange={(toColumn) => updateRelationship(relationship.id, { toColumn: toColumn ?? "" })} />
               </div>
             </div>
             <p className="rounded-md bg-muted px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
@@ -453,8 +467,8 @@ function SingleColumnSelect({
   );
 }
 
-function columnDisplayName(column: ColumnOption) {
-  return column.label ?? column.name;
+function columnDisplayName(column?: ColumnOption) {
+  return column ? column.label ?? column.name : "Seleccionar";
 }
 
 function pickRelationshipColumns(fromDataset?: Dataset, toDataset?: Dataset) {
@@ -464,8 +478,8 @@ function pickRelationshipColumns(fromDataset?: Dataset, toDataset?: Dataset) {
   };
   if (!fromDataset || !toDataset) return fallback;
 
-  const toColumnsByName = new Map(toDataset.columns.map((column) => [normalizeColumnName(column.name), column.name]));
-  const matchingFromColumn = fromDataset.columns.find((column) => toColumnsByName.has(normalizeColumnName(column.name)));
+  const toColumnsByName = new Map(getDatasetColumnConfig(toDataset).map((column) => [normalizeColumnName(column.name), column.name]));
+  const matchingFromColumn = getDatasetColumnConfig(fromDataset).find((column) => toColumnsByName.has(normalizeColumnName(column.name)));
   if (!matchingFromColumn) return fallback;
 
   return {
@@ -489,7 +503,7 @@ function suggestBaseColumn(fromDataset: Dataset, toDataset: Dataset, toColumn: s
   let bestColumn = "";
   let bestMatches = 0;
 
-  fromDataset.columns.forEach((column) => {
+  getDatasetColumnConfig(fromDataset).forEach((column) => {
     if (column.name === currentFromColumn) return;
     const matches = fromDataset.rows.filter((row) => targetKeys.has(normalizeJoinKey(row[column.name]))).length;
     if (matches > bestMatches) {
@@ -609,7 +623,9 @@ function ColumnList({
                 onChange(updated);
               }}
             >
-              <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+              <SelectTrigger className="w-full min-w-0">
+                <span className="truncate text-left">{columnDisplayName(columns.find((column) => column.name === value))}</span>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value={EMPTY_SELECT_VALUE}>Sin seleccion</SelectItem>
                 {columns.map((column) => <SelectItem key={column.name} value={column.name}>{column.label ?? column.name} - {column.type}</SelectItem>)}

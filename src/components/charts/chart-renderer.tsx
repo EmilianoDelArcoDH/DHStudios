@@ -3,8 +3,8 @@
 import dynamic from "next/dynamic";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
-import type { ChartConfig, Dataset, DatasetRow, ReportWidget } from "@/types";
-import { aggregate, applyFilters } from "@/lib/dataset";
+import type { ChartConfig, ColumnFormat, Dataset, DatasetColumnConfig, DatasetRow, ReportWidget, WidgetMetric } from "@/types";
+import { aggregate, applyCalculatedFields, applyFilters, getDatasetColumnConfig, getVisibleDatasetColumns } from "@/lib/dataset";
 import { executeWidgetQuery, queryFieldFromKey } from "@/lib/data-model/query";
 import type { DataModel } from "@/lib/data-model/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,9 +41,17 @@ function activeDimensions(config: ChartConfig) {
   return dimensions.length ? dimensions : config.dimension ? [config.dimension] : [];
 }
 
+function activeMetricConfigs(config: ChartConfig): WidgetMetric[] {
+  const metrics = config.metrics?.filter(Boolean).map((metric) => (
+    typeof metric === "string"
+      ? { id: metric, column: metric, label: metric, aggregation: config.aggregation }
+      : metric
+  )) ?? [];
+  return metrics.length ? metrics : config.metric ? [{ id: config.metric, column: config.metric, label: config.metric, aggregation: config.aggregation }] : [];
+}
+
 function activeMetrics(config: ChartConfig) {
-  const metrics = config.metrics?.filter(Boolean) ?? [];
-  return metrics.length ? metrics : config.metric ? [config.metric] : [];
+  return activeMetricConfigs(config).map((metric) => metric.column ?? metric.id);
 }
 
 function rowLabel(row: DatasetRow, dimensions: string[]) {
@@ -53,10 +61,16 @@ function rowLabel(row: DatasetRow, dimensions: string[]) {
 
 function buildChartData(dataset: Dataset | undefined, config: ChartConfig) {
   const dimensions = activeDimensions(config);
-  const metrics = activeMetrics(config);
+  const columnConfigByName = new Map(dataset ? getDatasetColumnConfig(dataset).map((column) => [column.name, column]) : []);
+  const metricConfigs = activeMetricConfigs(config).map((metric) => {
+    const column = columnConfigByName.get(metric.column ?? metric.id);
+    return { ...metric, label: column?.label ?? metric.label };
+  });
+  const metrics = metricConfigs.map((metric) => metric.column ?? metric.id);
   if (!dataset) return { dimensions, metrics, categories: [], series: [] as { name: string; data: number[] }[], rows: [] as DatasetRow[] };
 
-  const rows = applyFilters(dataset.rows, config.filters ?? []);
+  const rowsWithCalculatedFields = applyCalculatedFields(dataset.rows, [...(dataset.calculatedFields ?? []), ...(config.calculatedFields ?? [])]);
+  const rows = applyFilters(rowsWithCalculatedFields, [...(config.globalFilters ?? []), ...(config.filters ?? [])]);
   const groups = new Map<string, DatasetRow[]>();
   rows.forEach((row) => {
     const label = rowLabel(row, dimensions);
@@ -64,12 +78,12 @@ function buildChartData(dataset: Dataset | undefined, config: ChartConfig) {
   });
 
   const categories = Array.from(groups.keys()).slice(0, config.limit ?? 50);
-  const series = (metrics.length ? metrics : ["registros"]).map((metric) => ({
-    name: metric,
+  const series = (metricConfigs.length ? metricConfigs : [{ id: "registros", label: "registros", aggregation: "count" as const }]).map((metric) => ({
+    name: metric.label,
     data: categories.map((category) => {
       const groupedRows = groups.get(category) ?? [];
-      const values = metric === "registros" ? groupedRows.map(() => 1) : groupedRows.map((row) => row[metric]);
-      return aggregate(values, metric === "registros" ? "count" : config.aggregation);
+      const values = metric.column ? groupedRows.map((row) => row[metric.column!]) : groupedRows.map(() => 1);
+      return aggregate(values, metric.aggregation);
     }),
   }));
 
@@ -240,11 +254,12 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel }: Props) {
 
   if (widget.type === "table") {
     const selectedColumns = activeDimensions(widget.config);
-    const fallbackColumns = dataset.columns.map((column) => column.name);
+    const fallbackColumns = getVisibleDatasetColumns(dataset).map((column) => column.name);
     return (
       <DataTable
         rows={chartData.rows}
         columnKeys={selectedColumns.length ? selectedColumns : fallbackColumns}
+        columnConfigs={getDatasetColumnConfig(dataset)}
         limit={widget.config.limit ?? 20}
       />
     );
@@ -252,11 +267,12 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel }: Props) {
 
   if (widget.type === "kpi" || widget.type === "scorecard") {
     const value = chartData.series[0]?.data[0] ?? 0;
+    const metricConfig = getDatasetColumnConfig(dataset).find((column) => column.name === widget.config.metric);
     return (
       <div className="flex h-full flex-col justify-center px-4">
         <span className="text-xs text-muted-foreground">{widget.style.title}</span>
-        <strong className="font-mono text-3xl tracking-normal">{Intl.NumberFormat("es-AR").format(value)}</strong>
-        <span className="text-xs text-muted-foreground">{widget.config.aggregation} de {widget.config.metric ?? "registros"}</span>
+        <strong className="font-mono text-3xl tracking-normal">{formatValue(value, metricConfig?.format)}</strong>
+        <span className="text-xs text-muted-foreground">{widget.config.aggregation} de {metricConfig?.label ?? widget.config.metric ?? "registros"}</span>
       </div>
     );
   }
@@ -308,15 +324,16 @@ function MeasuredChart({ option }: { option: object }) {
   );
 }
 
-function DataTable({ rows, columnKeys, limit }: { rows: DatasetRow[]; columnKeys: string[]; limit: number }) {
+function DataTable({ rows, columnKeys, columnConfigs, limit }: { rows: DatasetRow[]; columnKeys: string[]; columnConfigs: DatasetColumnConfig[]; limit: number }) {
+  const configByName = useMemo(() => new Map(columnConfigs.map((column) => [column.name, column])), [columnConfigs]);
   const columns = useMemo(
     () => columnKeys.map((column) => ({
       id: column,
       accessorFn: (row: DatasetRow) => row[column],
-      header: readableColumnName(column),
-      cell: (info: { getValue: () => unknown }) => String(info.getValue() ?? ""),
+      header: configByName.get(column)?.label ?? readableColumnName(column),
+      cell: (info: { getValue: () => unknown }) => formatValue(info.getValue(), configByName.get(column)?.format),
     })),
-    [columnKeys],
+    [columnKeys, configByName],
   );
   const data = useMemo(() => rows.slice(0, limit), [rows, limit]);
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -347,6 +364,18 @@ function DataTable({ rows, columnKeys, limit }: { rows: DatasetRow[]; columnKeys
 function readableColumnName(column: string) {
   const separator = column.indexOf(".");
   return separator === -1 ? column : column.slice(separator + 1);
+}
+
+function formatValue(value: unknown, format: ColumnFormat = "text") {
+  if (value === null || value === undefined || value === "") return "";
+  if (format === "currency") return Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(Number(value));
+  if (format === "percent") return Intl.NumberFormat("es-AR", { style: "percent", maximumFractionDigits: 1 }).format(Number(value));
+  if (format === "number") return Intl.NumberFormat("es-AR").format(Number(value));
+  if (format === "date") {
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString("es-AR");
+  }
+  return String(value);
 }
 
 function EmptyWidget({ label }: { label: string }) {

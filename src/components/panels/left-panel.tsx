@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, FileText, Layers, PanelLeftClose, Plus, Trash2 } from "lucide-react";
+import { Database, FileText, Layers, PanelLeftClose, Plus, Settings2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,7 +9,7 @@ import { DatasourceUploader } from "@/components/datasources/datasource-uploader
 import { useEditorStore } from "@/store/editor-store";
 import { cn } from "@/lib/utils";
 
-export function LeftPanel({ onCollapse }: { onCollapse?: () => void }) {
+export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => void; onManageDataset?: (datasetId: string) => void }) {
   const { report, activePageId, selectPage, addPage, removeDataset } = useEditorStore();
 
   const confirmRemoveDataset = (datasetId: string, datasetName: string) => {
@@ -69,6 +69,10 @@ export function LeftPanel({ onCollapse }: { onCollapse?: () => void }) {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+                <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => onManageDataset?.(dataset.id)}>
+                  <Settings2 className="mr-2 h-4 w-4" />
+                  Gestionar
+                </Button>
               </div>
             ))}
           </div>

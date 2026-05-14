@@ -1,8 +1,9 @@
 "use client";
 
 import { create } from "zustand";
-import type { Dataset, Report, ReportMode, ReportPage, ReportTheme, ReportWidget, WidgetType } from "@/types";
+import type { Dataset, Report, ReportMode, ReportPage, ReportTheme, ReportWidget, WidgetMetric, WidgetType } from "@/types";
 import { createEmptyReport, defaultTheme } from "@/lib/demo-data";
+import { ensureDatasetConfig } from "@/lib/dataset";
 import { reportService } from "@/services/report-service";
 
 type Snapshot = Report;
@@ -34,6 +35,7 @@ type EditorState = {
   sendWidgetToBack: (widgetId: string) => void;
   removeWidget: (widgetId: string) => void;
   addDataset: (dataset: Dataset) => void;
+  updateDataset: (datasetId: string, patch: Partial<Dataset>) => void;
   removeDataset: (datasetId: string) => void;
   updateDataModel: (dataModel: NonNullable<Report["dataModel"]>) => void;
   updateTheme: (theme: Partial<ReportTheme>) => void;
@@ -45,6 +47,9 @@ type EditorState = {
 const timestamp = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
 const fieldBelongsToDataset = (field: string | undefined, datasetId: string) => Boolean(field?.startsWith(`${datasetId}.`));
+const metricField = (metric: string | WidgetMetric | undefined) => (
+  typeof metric === "string" ? metric : metric?.column ?? metric?.id
+);
 
 function withHistory(state: EditorState, report: Report) {
   return { report, past: [...state.past.slice(-24), state.report], future: [], error: undefined };
@@ -67,7 +72,7 @@ function visibleDatasetName(name: string, datasets: Dataset[]) {
 function cleanWidgetDatasetReferences(widget: ReportWidget, datasetId: string): ReportWidget {
   const usesDeletedDataset = widget.config.datasetId === datasetId || widget.config.baseDatasetId === datasetId;
   const nextDimensions = (widget.config.dimensions ?? []).filter((field) => !fieldBelongsToDataset(field, datasetId));
-  const nextMetrics = (widget.config.metrics ?? []).filter((field) => !fieldBelongsToDataset(field, datasetId));
+  const nextMetrics = (widget.config.metrics ?? []).filter((field) => !fieldBelongsToDataset(metricField(field), datasetId));
   const nextFilters = (widget.config.filters ?? []).filter((filter) => !fieldBelongsToDataset(filter.column, datasetId));
 
   if (usesDeletedDataset) {
@@ -103,7 +108,7 @@ function cleanWidgetDatasetReferences(widget: ReportWidget, datasetId: string): 
       ...widget.config,
       dimension: fieldBelongsToDataset(widget.config.dimension, datasetId) ? nextDimensions[0] : widget.config.dimension,
       dimensions: nextDimensions,
-      metric: fieldBelongsToDataset(widget.config.metric, datasetId) ? nextMetrics[0] : widget.config.metric,
+      metric: fieldBelongsToDataset(widget.config.metric, datasetId) ? metricField(nextMetrics[0]) : widget.config.metric,
       metrics: nextMetrics,
       filters: nextFilters,
     },
@@ -113,6 +118,10 @@ function cleanWidgetDatasetReferences(widget: ReportWidget, datasetId: string): 
 
 function activePage(state: EditorState) {
   return state.report.pages.find((page) => page.id === state.activePageId) ?? state.report.pages[0];
+}
+
+function normalizeReportDatasets(report: Report): Report {
+  return { ...report, datasets: report.datasets.map(ensureDatasetConfig) };
 }
 
 function defaultWidget(type: WidgetType, projectId: string, pageId: string, datasetId?: string): ReportWidget {
@@ -173,7 +182,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     past: [],
     future: [],
 
-    setReport: (report) => set({ report, activePageId: report.pages[0]?.id, selectedWidgetId: undefined, past: [], future: [] }),
+    setReport: (report) => set({ report: normalizeReportDatasets(report), activePageId: report.pages[0]?.id, selectedWidgetId: undefined, past: [], future: [] }),
     setMode: (mode) => set({ mode }),
     setZoom: (zoom) => set({ zoom: Math.min(1.4, Math.max(0.55, zoom)) }),
     selectPage: (pageId) => set({ activePageId: pageId, selectedWidgetId: undefined }),
@@ -331,17 +340,28 @@ export const useEditorStore = create<EditorState>((set, get) => {
 
     addDataset: (dataset) =>
       set((state) => {
-        const nextDataset = {
+        const nextDataset = ensureDatasetConfig({
           ...dataset,
           id: state.report.datasets.some((item) => item.id === dataset.id) ? uuid() : dataset.id || uuid(),
           projectId: state.report.projectId,
           name: visibleDatasetName(dataset.name || "Dataset", state.report.datasets),
           createdAt: dataset.createdAt || timestamp(),
           updatedAt: timestamp(),
-        };
+        });
 
         return withHistory(state, { ...state.report, datasets: [...state.report.datasets, nextDataset], updatedAt: timestamp() });
       }),
+
+    updateDataset: (datasetId, patch) =>
+      set((state) =>
+        withHistory(state, {
+          ...state.report,
+          datasets: state.report.datasets.map((dataset) =>
+            dataset.id === datasetId ? ensureDatasetConfig({ ...dataset, ...patch, updatedAt: timestamp() }) : dataset,
+          ),
+          updatedAt: timestamp(),
+        }),
+      ),
 
     removeDataset: (datasetId) =>
       set((state) => {

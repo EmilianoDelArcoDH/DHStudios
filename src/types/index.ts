@@ -1,6 +1,8 @@
 export type ID = string;
 
 export type ColumnType = "text" | "number" | "date" | "boolean";
+export type ColumnFormat = "text" | "number" | "currency" | "percent" | "date";
+export type AggregationType = "none" | "sum" | "avg" | "min" | "max" | "count" | "countDistinct";
 export type WidgetType =
   | "bar"
   | "horizontal_bar"
@@ -20,7 +22,7 @@ export type WidgetType =
   | "control_text"
   | "control_date"
   | "control_select";
-export type Aggregation = "sum" | "avg" | "count" | "min" | "max";
+export type Aggregation = "sum" | "avg" | "count" | "countDistinct" | "min" | "max";
 export type ReportMode = "edit" | "view";
 
 export type DatasetColumn = {
@@ -31,14 +33,37 @@ export type DatasetColumn = {
 
 export type DatasetRow = Record<string, string | number | boolean | null>;
 
+export type DatasetColumnConfig = {
+  name: string;
+  label: string;
+  type: ColumnType;
+  format: ColumnFormat;
+  defaultAggregation: AggregationType;
+  visible: boolean;
+  isCalculated?: boolean;
+  formula?: string;
+};
+
+export type CalculatedField = {
+  id: string;
+  name: string;
+  label: string;
+  formula: string;
+  type: ColumnType;
+  format: ColumnFormat;
+  defaultAggregation: AggregationType;
+};
+
 export type Dataset = {
   id: ID;
   projectId: ID;
   ownerId?: ID;
   name: string;
-  sourceType: "csv" | "google_sheets" | "manual";
+  sourceType: "csv" | "google_sheets" | "manual" | "unknown";
   sourceUrl?: string | null;
   columns: DatasetColumn[];
+  columnConfig?: DatasetColumnConfig[];
+  calculatedFields?: CalculatedField[];
   rows: DatasetRow[];
   createdAt: string;
   updatedAt: string;
@@ -52,15 +77,24 @@ export type WidgetFilter = {
   value: string | number | boolean | [string, string];
 };
 
+export type WidgetMetric = {
+  id: string;
+  column?: string;
+  label: string;
+  aggregation: Aggregation;
+};
+
 export type ChartConfig = {
   datasetId?: ID;
   baseDatasetId?: ID;
   dimension?: string;
   dimensions?: string[];
   metric?: string;
-  metrics?: string[];
+  metrics?: Array<string | WidgetMetric>;
   aggregation: Aggregation;
   filters: WidgetFilter[];
+  globalFilters?: WidgetFilter[];
+  calculatedFields?: CalculatedField[];
   orderBy?: string;
   orderDirection?: "asc" | "desc";
   limit?: number;
