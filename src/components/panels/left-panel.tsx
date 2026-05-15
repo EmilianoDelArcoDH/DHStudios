@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { AreaChart, BarChart3, BringToFront, Database, FileText, Image as ImageIcon, Layers, LineChart, ListFilter, Lock, PanelLeftClose, PieChart, Plus, ScatterChart, SendToBack, Table2, TextCursorInput, Trash2, Type, Unlock, Settings2 } from "lucide-react";
+import { AreaChart, BarChart3, BringToFront, Copy, Database, FileText, Image as ImageIcon, Layers, LineChart, ListFilter, Lock, MoreHorizontal, PanelLeftClose, PieChart, Plus, ScatterChart, SendToBack, Table2, TextCursorInput, Trash2, Type, Unlock, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DatasourceUploader } from "@/components/datasources/datasource-uploader";
@@ -20,12 +22,17 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
     selectPage,
     selectWidget,
     addPage,
+    duplicatePage,
+    updatePage,
+    removePage,
     removeDataset,
     toggleWidgetLocked,
     bringWidgetToFront,
     sendWidgetToBack,
   } = useEditorStore();
   const [datasetToDelete, setDatasetToDelete] = useState<{ id: string; name: string } | undefined>();
+  const [pageToDelete, setPageToDelete] = useState<{ id: string; name: string } | undefined>();
+  const [renamingPageId, setRenamingPageId] = useState<string | undefined>();
   const activePage = report.pages.find((page) => page.id === activePageId) ?? report.pages[0];
   const layers = [...(activePage?.widgets ?? [])].reverse();
 
@@ -33,6 +40,12 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
     if (!datasetToDelete) return;
     removeDataset(datasetToDelete.id);
     setDatasetToDelete(undefined);
+  };
+
+  const confirmRemovePage = () => {
+    if (!pageToDelete) return;
+    removePage(pageToDelete.id);
+    setPageToDelete(undefined);
   };
 
   return (
@@ -63,15 +76,71 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
               </div>
               <div className="space-y-1">
                 {report.pages.map((page) => (
-                  <button
+                  <div
                     key={page.id}
-                    onClick={() => selectPage(page.id)}
-                    className={cn("flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-foreground hover:bg-card", activePageId === page.id && "bg-card shadow-sm ring-1 ring-[var(--dh-border)]")}
+                    className={cn("group flex items-center gap-1 rounded-md px-1 py-1 text-sm text-foreground hover:bg-card", activePageId === page.id && "bg-card shadow-sm ring-1 ring-[var(--dh-border)]")}
                   >
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    {page.name}
-                    <Badge variant="secondary" className="ml-auto">{page.widgets.length}</Badge>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => selectPage(page.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1 py-1 text-left"
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      {renamingPageId === page.id ? (
+                        <Input
+                          autoFocus
+                          value={page.name}
+                          className="h-7 min-w-0 px-2 text-sm"
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => updatePage(page.id, { name: event.target.value })}
+                          onBlur={() => setRenamingPageId(undefined)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === "Escape") setRenamingPageId(undefined);
+                          }}
+                        />
+                      ) : (
+                        <span className="truncate">{page.name}</span>
+                      )}
+                      <Badge variant="secondary" className="ml-auto shrink-0">{page.widgets.length}</Badge>
+                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            title="Acciones de pagina"
+                            aria-label={`Acciones de ${page.name}`}
+                            variant="ghost"
+                            size="icon-xs"
+                            className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100"
+                            onClick={(event) => event.stopPropagation()}
+                          />
+                        }
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem onClick={() => setRenamingPageId(page.id)}>
+                            <FileText className="h-4 w-4" />
+                            Renombrar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => duplicatePage(page.id)}>
+                            <Copy className="h-4 w-4" />
+                            Duplicar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={report.pages.length <= 1}
+                            onClick={() => setPageToDelete({ id: page.id, name: page.name })}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 ))}
               </div>
               <div className="space-y-2 rounded-md border border-[var(--dh-border)] bg-card p-2">
@@ -158,6 +227,26 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={Boolean(pageToDelete)} onOpenChange={(open) => {
+        if (!open) setPageToDelete(undefined);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar pagina</DialogTitle>
+            <DialogDescription>
+              Vas a eliminar <span className="font-medium">{pageToDelete?.name}</span> y todos sus componentes.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPageToDelete(undefined)}>Cancelar</Button>
+            <Button variant="destructive" onClick={confirmRemovePage}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              Eliminar pagina
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }
@@ -214,7 +303,7 @@ function widgetIcon(type: WidgetType) {
   if (type === "line" || type === "multi_line") return <LineChart className={className} />;
   if (type === "area") return <AreaChart className={className} />;
   if (type === "scatter") return <ScatterChart className={className} />;
-  if (type === "table") return <Table2 className={className} />;
+  if (type === "table" || type === "pivot_table") return <Table2 className={className} />;
   if (type === "text") return <Type className={className} />;
   if (type === "image") return <ImageIcon className={className} />;
   if (type.startsWith("control")) return <ListFilter className={className} />;
@@ -235,6 +324,7 @@ function widgetLabel(type: WidgetType) {
     combo: "Combo",
     scatter: "Dispersion",
     table: "Tabla",
+    pivot_table: "Tabla dinamica",
     kpi: "KPI",
     scorecard: "Scorecard",
     text: "Texto",

@@ -42,6 +42,10 @@ const pieLegend = {
 };
 
 function activeDimensions(config: ChartConfig) {
+  const drillDimensions = config.drillDimensions?.filter(Boolean) ?? [];
+  if (drillDimensions.length) {
+    return [drillDimensions[Math.min(config.drillLevel ?? 0, drillDimensions.length - 1)]];
+  }
   const dimensions = config.dimensions?.filter(Boolean) ?? [];
   return dimensions.length ? dimensions : config.dimension ? [config.dimension] : [];
 }
@@ -52,7 +56,16 @@ function activeMetricConfigs(config: ChartConfig): WidgetMetric[] {
       ? { id: metric, column: metric, label: metric, aggregation: config.aggregation }
       : metric
   )) ?? [];
+  const activeOptionalMetric = config.activeOptionalMetric;
+  if (activeOptionalMetric) {
+    const optional = (config.optionalMetrics ?? []).find((metric) => metricKey(metric) === activeOptionalMetric);
+    if (optional) return [typeof optional === "string" ? { id: optional, column: optional, label: optional, aggregation: config.aggregation } : optional];
+  }
   return metrics.length ? metrics : config.metric ? [{ id: config.metric, column: config.metric, label: config.metric, aggregation: config.aggregation }] : [];
+}
+
+function metricKey(metric: string | WidgetMetric) {
+  return typeof metric === "string" ? metric : metric.column ?? metric.id;
 }
 
 function activeMetrics(config: ChartConfig) {
@@ -107,6 +120,16 @@ function buildChartData(dataset: Dataset | undefined, config: ChartConfig) {
   return { dimensions, metrics, rows, categories, series };
 }
 
+function validateWidget(dataset: Dataset | undefined, config: ChartConfig) {
+  if (!dataset) return "Selecciona una fuente de datos.";
+  const columns = new Set(getDatasetColumnConfig(dataset).map((column) => column.name));
+  const missingDimension = activeDimensions(config).find((dimension) => !columns.has(dimension));
+  const missingMetric = activeMetrics(config).find((metric) => metric && !columns.has(metric));
+  if (missingDimension) return `La dimension no es valida: ${readableColumnName(missingDimension)}.`;
+  if (missingMetric) return `La metrica no es valida: ${readableColumnName(missingMetric)}.`;
+  return "";
+}
+
 function buildModelChartData(datasets: Dataset[] | undefined, dataModel: DataModel | undefined, config: ChartConfig) {
   const baseDatasetId = config.baseDatasetId ?? config.datasetId;
   if (!baseDatasetId || !datasets?.length) return undefined;
@@ -131,6 +154,9 @@ function buildModelChartData(datasets: Dataset[] | undefined, dataModel: DataMod
 }
 
 function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters = [] }: Props) {
+  const setInteractionFilter = useEditorStore((state) => state.setInteractionFilter);
+  const interactionFilter = useEditorStore((state) => state.interactionFilters[widget.id]);
+  const updateWidget = useEditorStore((state) => state.updateWidget);
   const effectiveConfig = useMemo(() => ({ ...widget.config, globalFilters }), [globalFilters, widget.config]);
   const chartData = useMemo(
     () => buildModelChartData(datasets, dataModel, effectiveConfig) ?? buildChartData(dataset, effectiveConfig),
@@ -258,6 +284,29 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
 
   if (!dataset) return <EmptyWidget label="Seleccioná una fuente de datos" />;
 
+  const validationMessage = validateWidget(dataset, widget.config);
+  if (validationMessage) return <InvalidWidget label={validationMessage} />;
+
+  const handleCategoryClick = (category: string) => {
+    const dimension = activeDimensions(widget.config)[0];
+    if (!dimension || !widget.config.enableCrossFilter) return;
+    const current = interactionFilter?.operator === "equals" ? String(interactionFilter.value) : "";
+    setInteractionFilter(widget.id, current === category ? undefined : { column: dimension, operator: "equals", value: category });
+  };
+
+  const drillDown = () => {
+    const drillDimensions = widget.config.drillDimensions ?? [];
+    const nextLevel = Math.min((widget.config.drillLevel ?? 0) + 1, drillDimensions.length - 1);
+    if (drillDimensions.length > 1 && nextLevel !== (widget.config.drillLevel ?? 0)) {
+      updateWidget(widget.id, { config: { ...widget.config, drillLevel: nextLevel, dimension: drillDimensions[nextLevel], dimensions: [drillDimensions[nextLevel]] } });
+    }
+  };
+
+  const resetDrill = () => {
+    const first = widget.config.drillDimensions?.[0];
+    updateWidget(widget.id, { config: { ...widget.config, drillLevel: 0, dimension: first ?? widget.config.dimension, dimensions: first ? [first] : widget.config.dimensions } });
+  };
+
   if (widget.type === "table") {
     const selectedColumns = activeDimensions(widget.config);
     const fallbackColumns = getVisibleDatasetColumns(dataset).map((column) => column.name);
@@ -266,6 +315,26 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
         rows={chartData.rows}
         columnKeys={selectedColumns.length ? selectedColumns : fallbackColumns}
         columnConfigs={getDatasetColumnConfig(dataset)}
+        limit={widget.config.limit ?? 20}
+        onRowClick={(row) => {
+          const dimension = activeDimensions(widget.config)[0] ?? selectedColumns[0];
+          const value = dimension ? row[dimension] : undefined;
+          if (value !== undefined && value !== null) handleCategoryClick(String(value));
+        }}
+      />
+    );
+  }
+
+  if (widget.type === "pivot_table") {
+    const [rowDimension, columnDimension] = widget.config.dimensions ?? [];
+    return (
+      <PivotTable
+        rows={chartData.rows}
+        rowDimension={rowDimension}
+        columnDimension={columnDimension}
+        metric={activeMetricConfigs(widget.config)[0]}
+        columnConfigs={getDatasetColumnConfig(dataset)}
+        aggregation={widget.config.aggregation}
         limit={widget.config.limit ?? 20}
       />
     );
@@ -284,10 +353,15 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
     );
   }
 
-  return <MeasuredChart option={option} />;
+  return (
+    <div className="relative h-full">
+      <ChartQuickActions widget={widget} dataset={dataset} chartData={chartData} onMetricChange={(metric) => updateWidget(widget.id, { config: { ...widget.config, activeOptionalMetric: metric } })} onDrillDown={drillDown} onResetDrill={resetDrill} />
+      <MeasuredChart option={option} onCategoryClick={handleCategoryClick} />
+    </div>
+  );
 }
 
-function MeasuredChart({ option }: { option: object }) {
+function MeasuredChart({ option, onCategoryClick }: { option: object; onCategoryClick?: (category: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -319,6 +393,7 @@ function MeasuredChart({ option }: { option: object }) {
       {ready ? (
         <ReactECharts
           option={option}
+          onEvents={{ click: (params: { name?: string }) => params.name ? onCategoryClick?.(String(params.name)) : undefined }}
           style={{ height: "100%", width: "100%" }}
           notMerge
           lazyUpdate
@@ -331,7 +406,7 @@ function MeasuredChart({ option }: { option: object }) {
   );
 }
 
-function DataTable({ rows, columnKeys, columnConfigs, limit }: { rows: DatasetRow[]; columnKeys: string[]; columnConfigs: DatasetColumnConfig[]; limit: number }) {
+function DataTable({ rows, columnKeys, columnConfigs, limit, onRowClick }: { rows: DatasetRow[]; columnKeys: string[]; columnConfigs: DatasetColumnConfig[]; limit: number; onRowClick?: (row: DatasetRow) => void }) {
   const configByName = useMemo(() => new Map(columnConfigs.map((column) => [column.name, column])), [columnConfigs]);
   const columns = useMemo(
     () => columnKeys.map((column) => ({
@@ -358,7 +433,7 @@ function DataTable({ rows, columnKeys, columnConfigs, limit }: { rows: DatasetRo
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows.map((row) => (
-            <TableRow key={row.id}>
+            <TableRow key={row.id} className={onRowClick ? "cursor-pointer" : undefined} onClick={() => onRowClick?.(row.original)}>
               {row.getVisibleCells().map((cell) => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
             </TableRow>
           ))}
@@ -371,6 +446,136 @@ function DataTable({ rows, columnKeys, columnConfigs, limit }: { rows: DatasetRo
 function readableColumnName(column: string) {
   const separator = column.indexOf(".");
   return separator === -1 ? column : column.slice(separator + 1);
+}
+
+function ChartQuickActions({
+  widget,
+  dataset,
+  chartData,
+  onMetricChange,
+  onDrillDown,
+  onResetDrill,
+}: {
+  widget: ReportWidget;
+  dataset?: Dataset;
+  chartData: ReturnType<typeof buildChartData>;
+  onMetricChange: (metric?: string) => void;
+  onDrillDown: () => void;
+  onResetDrill: () => void;
+}) {
+  const optionalMetrics = widget.config.optionalMetrics ?? [];
+  const drillDimensions = widget.config.drillDimensions ?? [];
+  const metricOptions = optionalMetrics.map((metric) => {
+    const key = metricKey(metric);
+    const columnLabel = dataset ? getDatasetColumnConfig(dataset).find((column) => column.name === key)?.label : undefined;
+    return { key, label: typeof metric === "string" ? columnLabel ?? metric : metric.label };
+  });
+
+  // const exportCsv = () => downloadCsv(`${widget.style.title ?? "grafico"}.csv`, chartDataToCsv(chartData));
+
+  // if (!metricOptions.length && drillDimensions.length <= 1) {
+  //   return (
+  //     <div className="absolute right-2 top-2 z-10">
+  //       <Button variant="outline" size="sm" className="h-7 bg-card/95 px-2 text-xs" onClick={exportCsv}>CSV</Button>
+  //     </div>
+  //   );
+  // }
+
+  return (
+    <div>
+      {metricOptions.length ? (
+        <Select value={widget.config.activeOptionalMetric ?? ""} onValueChange={(value) => onMetricChange(value || undefined)}>
+          <SelectTrigger className="h-7 w-32 px-2 text-xs">
+            <SelectValue placeholder="Metrica" />
+          </SelectTrigger>
+          <SelectContent>
+            {metricOptions.map((metric) => <SelectItem key={metric.key} value={metric.key}>{metric.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      ) : null}
+      {drillDimensions.length > 1 ? (
+        <>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onDrillDown}>Drill</Button>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onResetDrill}>Reset</Button>
+        </>
+      ) : null}
+      {/* <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={exportCsv}>CSV</Button> */}
+    </div>
+  );
+}
+
+function chartDataToCsv(chartData: ReturnType<typeof buildChartData>) {
+  const header = ["dimension", ...chartData.series.map((serie) => serie.name)];
+  const rows = chartData.categories.map((category, index) => [
+    category,
+    ...chartData.series.map((serie) => String(serie.data[index] ?? "")),
+  ]);
+  return [header, ...rows].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\n");
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function PivotTable({
+  rows,
+  rowDimension,
+  columnDimension,
+  metric,
+  columnConfigs,
+  aggregation,
+  limit,
+}: {
+  rows: DatasetRow[];
+  rowDimension?: string;
+  columnDimension?: string;
+  metric?: WidgetMetric;
+  columnConfigs: DatasetColumnConfig[];
+  aggregation: WidgetMetric["aggregation"];
+  limit: number;
+}) {
+  if (!rowDimension || !columnDimension) return <InvalidWidget label="Configura filas y columnas para la tabla dinamica." />;
+  const rowLabels = Array.from(new Set(rows.map((row) => String(row[rowDimension] ?? "Sin valor")))).slice(0, limit);
+  const columnLabels = Array.from(new Set(rows.map((row) => String(row[columnDimension] ?? "Sin valor")))).slice(0, 30);
+  const metricColumn = metric?.column ?? metric?.id;
+  const metricConfig = columnConfigs.find((column) => column.name === metricColumn);
+
+  const cellValue = (rowLabelValue: string, columnLabelValue: string) => {
+    const grouped = rows.filter((row) => String(row[rowDimension] ?? "Sin valor") === rowLabelValue && String(row[columnDimension] ?? "Sin valor") === columnLabelValue);
+    return aggregate(metricColumn ? grouped.map((row) => row[metricColumn]) : grouped.map(() => 1), metric?.aggregation ?? aggregation);
+  };
+
+  return (
+    <div className="h-full overflow-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{columnConfigs.find((column) => column.name === rowDimension)?.label ?? rowDimension}</TableHead>
+            {columnLabels.map((label) => <TableHead key={label} className="text-right">{label}</TableHead>)}
+            <TableHead className="text-right">Total</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rowLabels.map((rowLabelValue) => {
+            const values = columnLabels.map((columnLabelValue) => cellValue(rowLabelValue, columnLabelValue));
+            return (
+              <TableRow key={rowLabelValue}>
+                <TableCell className="font-medium">{rowLabelValue}</TableCell>
+                {values.map((value, index) => <TableCell key={`${rowLabelValue}-${columnLabels[index]}`} className="text-right">{formatValue(value, metricConfig?.format ?? "number")}</TableCell>)}
+                <TableCell className="text-right font-semibold">{formatValue(values.reduce((sum, value) => sum + value, 0), metricConfig?.format ?? "number")}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
 }
 
 function ControlWidget({ widget, dataset }: { widget: ReportWidget; dataset?: Dataset }) {
@@ -445,6 +650,16 @@ function formatValue(value: unknown, format: ColumnFormat = "text") {
 
 function EmptyWidget({ label }: { label: string }) {
   return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{label}</div>;
+}
+
+function InvalidWidget({ label }: { label: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-muted-foreground">
+      <div className="font-mono text-lg">!</div>
+      <div className="text-sm font-semibold text-foreground">Configuracion no valida</div>
+      <div className="max-w-xs text-xs">{label}</div>
+    </div>
+  );
 }
 
 export const ChartRenderer = memo(ChartRendererBase);

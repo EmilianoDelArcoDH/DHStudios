@@ -15,6 +15,7 @@ export type WidgetType =
   | "combo"
   | "scatter"
   | "table"
+  | "pivot_table"
   | "kpi"
   | "scorecard"
   | "text"
@@ -69,7 +70,7 @@ export type Dataset = {
   updatedAt: string;
 };
 
-export type FilterOperator = "contains" | "equals" | "gte" | "lte" | "between";
+export type FilterOperator = "contains" | "notContains" | "equals" | "notEquals" | "gte" | "lte" | "between" | "isNull" | "notNull";
 
 export type WidgetFilter = {
   column: string;
@@ -89,11 +90,18 @@ export type ChartConfig = {
   baseDatasetId?: ID;
   dimension?: string;
   dimensions?: string[];
+  drillDimensions?: string[];
+  drillLevel?: number;
   metric?: string;
   metrics?: Array<string | WidgetMetric>;
+  optionalMetrics?: Array<string | WidgetMetric>;
+  activeOptionalMetric?: string;
   aggregation: Aggregation;
   filters: WidgetFilter[];
   globalFilters?: WidgetFilter[];
+  pageFilters?: WidgetFilter[];
+  reportFilters?: WidgetFilter[];
+  enableCrossFilter?: boolean;
   calculatedFields?: CalculatedField[];
   orderBy?: string;
   orderDirection?: "asc" | "desc";
@@ -143,6 +151,7 @@ export type ReportPage = {
   projectId: ID;
   name: string;
   orderIndex: number;
+  filters?: WidgetFilter[];
   widgets: ReportWidget[];
   createdAt: string;
   updatedAt: string;
@@ -165,6 +174,7 @@ export type Report = {
   name: string;
   isPublic: boolean;
   theme: ReportTheme;
+  filters?: WidgetFilter[];
   pages: ReportPage[];
   datasets: Dataset[];
   dataModel?: import("@/lib/data-model/types").DataModel;

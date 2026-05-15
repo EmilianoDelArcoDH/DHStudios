@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { Dataset, Report, ReportMode, ReportPage, ReportTheme, ReportWidget, WidgetMetric, WidgetType } from "@/types";
+import type { Dataset, Report, ReportMode, ReportPage, ReportTheme, ReportWidget, WidgetFilter, WidgetMetric, WidgetType } from "@/types";
 import { createEmptyReport, defaultTheme } from "@/lib/demo-data";
 import { ensureDatasetConfig } from "@/lib/dataset";
 import { reportService } from "@/services/report-service";
@@ -18,6 +18,7 @@ type EditorState = {
   loading: boolean;
   error?: string;
   controlValues: Record<string, ControlValue>;
+  interactionFilters: Record<string, WidgetFilter>;
   past: Snapshot[];
   future: Snapshot[];
   setReport: (report: Report) => void;
@@ -26,9 +27,12 @@ type EditorState = {
   selectPage: (pageId: string) => void;
   selectWidget: (widgetId?: string) => void;
   setControlValue: (widgetId: string, value: ControlValue) => void;
+  setInteractionFilter: (widgetId: string, filter?: WidgetFilter) => void;
   updateReport: (patch: Partial<Omit<Report, "projectId">>) => void;
   addPage: () => void;
+  duplicatePage: (pageId: string) => void;
   updatePage: (pageId: string, patch: Partial<ReportPage>) => void;
+  removePage: (pageId: string) => void;
   addWidget: (type: WidgetType) => void;
   duplicateWidget: (widgetId: string) => void;
   updateWidget: (widgetId: string, patch: Partial<ReportWidget>) => void;
@@ -127,29 +131,122 @@ function normalizeReportDatasets(report: Report): Report {
   return { ...report, datasets: report.datasets.map(ensureDatasetConfig) };
 }
 
-function defaultWidget(type: WidgetType, projectId: string, pageId: string, datasetId?: string): ReportWidget {
+function widgetSize(type: WidgetType) {
   const isControl = type.startsWith("control");
   const isText = type === "text";
-  return {
-    id: uuid(),
-    projectId,
-    pageId,
-    type,
-    x: 0,
-    y: Infinity,
-    w: isControl || isText ? 3 : 5,
-    h: type === "scorecard" || type === "kpi" ? 3 : isControl || isText ? 2 : 5,
-    locked: false,
-    config: {
-      datasetId,
-      dimension: undefined,
-      dimensions: [],
+  if (type === "scorecard" || type === "kpi") return { w: 3, h: 3 };
+  if (isControl || isText) return { w: 3, h: 2 };
+  if (type === "table" || type === "pivot_table") return { w: 6, h: 5 };
+  return { w: 6, h: 5 };
+}
+
+function chartDefaults(type: WidgetType, dataset: Dataset | undefined): ReportWidget["config"] {
+  const columns = dataset ? ensureDatasetConfig(dataset).columnConfig ?? [] : [];
+  const dimension = columns.find((column) => column.visible && (column.type === "text" || column.type === "date"))?.name ?? columns.find((column) => column.visible)?.name;
+  const metric = columns.find((column) => column.visible && column.type === "number")?.name;
+
+  if (type.startsWith("control")) {
+    return {
+      datasetId: dataset?.id,
+      dimension,
+      dimensions: dimension ? [dimension] : [],
       metric: undefined,
       metrics: [],
       aggregation: "sum",
       filters: [],
       limit: 20,
-    },
+    };
+  }
+
+  if (type === "table" || type === "pivot_table") {
+    const dimensions = columns.filter((column) => column.visible).slice(0, 6).map((column) => column.name);
+    return {
+      datasetId: dataset?.id,
+      dimension: dimensions[0],
+      dimensions,
+      metric,
+      metrics: metric ? [metric] : [],
+      aggregation: "sum",
+      filters: [],
+      limit: 20,
+    };
+  }
+
+  if (type === "scorecard" || type === "kpi") {
+    return {
+      datasetId: dataset?.id,
+      dimension: undefined,
+      dimensions: [],
+      metric,
+      metrics: metric ? [metric] : [],
+      aggregation: "sum",
+      filters: [],
+      limit: 20,
+    };
+  }
+
+  if (type === "scatter") {
+    const metrics = columns.filter((column) => column.visible && column.type === "number").slice(0, 2).map((column) => column.name);
+    return {
+      datasetId: dataset?.id,
+      dimension: undefined,
+      dimensions: [],
+      metric: metrics[0],
+      metrics,
+      aggregation: "sum",
+      filters: [],
+      limit: 50,
+    };
+  }
+
+  return {
+    datasetId: dataset?.id,
+    dimension,
+    dimensions: dimension ? [dimension] : [],
+    metric,
+    metrics: metric ? [metric] : [],
+    aggregation: "sum",
+      filters: [],
+      pageFilters: [],
+      reportFilters: [],
+      enableCrossFilter: true,
+      orderDirection: "asc",
+    limit: 20,
+  };
+}
+
+function overlaps(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function findWidgetPlacement(widgets: ReportWidget[], size: { w: number; h: number }) {
+  const candidates = Array.from({ length: Math.max(1, 12 - size.w) }, (_, index) => index + 1);
+  const maxY = Math.max(16, ...widgets.map((widget) => widget.y + widget.h + 2));
+
+  for (let y = 1; y <= maxY; y += 1) {
+    for (const x of candidates) {
+      const candidate = { x, y, ...size };
+      if (!widgets.some((widget) => overlaps(candidate, widget))) return { x, y };
+    }
+  }
+
+  return { x: 1, y: maxY };
+}
+
+function defaultWidget(type: WidgetType, projectId: string, pageId: string, dataset?: Dataset, placement?: { x: number; y: number }): ReportWidget {
+  const isText = type === "text";
+  const size = widgetSize(type);
+  return {
+    id: uuid(),
+    projectId,
+    pageId,
+    type,
+    x: placement?.x ?? 1,
+    y: placement?.y ?? 1,
+    w: size.w,
+    h: size.h,
+    locked: false,
+    config: chartDefaults(type, dataset),
     style: {
       title: isText ? "Texto" : "Nuevo componente",
       showTitle: type !== "image",
@@ -184,6 +281,7 @@ export const useEditorStore = create<EditorState>((set, get) => {
     zoom: 1,
     loading: false,
     controlValues: {},
+    interactionFilters: {},
     past: [],
     future: [],
 
@@ -193,6 +291,12 @@ export const useEditorStore = create<EditorState>((set, get) => {
     selectPage: (pageId) => set({ activePageId: pageId, selectedWidgetId: undefined }),
     selectWidget: (widgetId) => set({ selectedWidgetId: widgetId }),
     setControlValue: (widgetId, value) => set((state) => ({ controlValues: { ...state.controlValues, [widgetId]: value } })),
+    setInteractionFilter: (widgetId, filter) => set((state) => {
+      const interactionFilters = { ...state.interactionFilters };
+      if (filter) interactionFilters[widgetId] = filter;
+      else delete interactionFilters[widgetId];
+      return { interactionFilters };
+    }),
 
     updateReport: (patch) =>
       set((state) => withHistory(state, { ...state.report, ...patch, updatedAt: timestamp() })),
@@ -204,11 +308,42 @@ export const useEditorStore = create<EditorState>((set, get) => {
           projectId: state.report.projectId,
           name: `Página ${state.report.pages.length + 1}`,
           orderIndex: state.report.pages.length,
+          filters: [],
           widgets: [],
           createdAt: timestamp(),
           updatedAt: timestamp(),
         };
         return { ...withHistory(state, { ...state.report, pages: [...state.report.pages, page], updatedAt: timestamp() }), activePageId: page.id };
+      }),
+
+    duplicatePage: (pageId) =>
+      set((state) => {
+        const sourcePage = state.report.pages.find((page) => page.id === pageId);
+        if (!sourcePage) return state;
+
+        const nextPageId = uuid();
+        const page: ReportPage = {
+          ...sourcePage,
+          id: nextPageId,
+          name: `${sourcePage.name} copia`,
+          orderIndex: state.report.pages.length,
+          widgets: sourcePage.widgets.map((widget) => ({
+            ...widget,
+            id: uuid(),
+            pageId: nextPageId,
+            locked: false,
+            createdAt: timestamp(),
+            updatedAt: timestamp(),
+          })),
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+        };
+
+        return {
+          ...withHistory(state, { ...state.report, pages: [...state.report.pages, page], updatedAt: timestamp() }),
+          activePageId: page.id,
+          selectedWidgetId: undefined,
+        };
       }),
 
     updatePage: (pageId, patch) =>
@@ -220,10 +355,29 @@ export const useEditorStore = create<EditorState>((set, get) => {
         }),
       ),
 
+    removePage: (pageId) =>
+      set((state) => {
+        if (state.report.pages.length <= 1) return state;
+
+        const pages = state.report.pages
+          .filter((page) => page.id !== pageId)
+          .map((page, index) => ({ ...page, orderIndex: index, updatedAt: timestamp() }));
+        const nextActivePageId = state.activePageId === pageId ? pages[0]?.id : state.activePageId;
+
+        return {
+          ...withHistory(state, { ...state.report, pages, updatedAt: timestamp() }),
+          activePageId: nextActivePageId,
+          selectedWidgetId: undefined,
+        };
+      }),
+
     addWidget: (type) =>
       set((state) => {
         const page = activePage(state);
-        const widget = defaultWidget(type, state.report.projectId, page.id, state.report.datasets[0]?.id);
+        const dataset = state.report.datasets[0];
+        const size = widgetSize(type);
+        const placement = findWidgetPlacement(page.widgets, size);
+        const widget = defaultWidget(type, state.report.projectId, page.id, dataset, placement);
         return {
           ...withHistory(state, {
             ...state.report,

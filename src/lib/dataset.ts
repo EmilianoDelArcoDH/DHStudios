@@ -139,9 +139,13 @@ export function applyFilters(rows: DatasetRow[], filters: WidgetFilter[]) {
     filters.every((filter) => {
       const value = row[filter.column];
       if (filter.operator === "contains") return String(value ?? "").toLowerCase().includes(String(filter.value).toLowerCase());
+      if (filter.operator === "notContains") return !String(value ?? "").toLowerCase().includes(String(filter.value).toLowerCase());
       if (filter.operator === "equals") return String(value ?? "") === String(filter.value);
+      if (filter.operator === "notEquals") return String(value ?? "") !== String(filter.value);
       if (filter.operator === "gte") return Number(value) >= Number(filter.value);
       if (filter.operator === "lte") return Number(value) <= Number(filter.value);
+      if (filter.operator === "isNull") return value === null || value === undefined || value === "";
+      if (filter.operator === "notNull") return value !== null && value !== undefined && value !== "";
       if (filter.operator === "between" && Array.isArray(filter.value)) {
         const current = new Date(String(value)).getTime();
         return current >= new Date(filter.value[0]).getTime() && current <= new Date(filter.value[1]).getTime();

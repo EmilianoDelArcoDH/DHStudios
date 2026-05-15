@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useEditorStore } from "@/store/editor-store";
-import type { Aggregation, ColumnType, Dataset, WidgetMetric, WidgetStyle, WidgetType } from "@/types";
+import type { Aggregation, ColumnType, Dataset, WidgetFilter, WidgetMetric, WidgetStyle, WidgetType } from "@/types";
 import { aggregationOrFallback, getDatasetColumnConfig, getVisibleDatasetColumns } from "@/lib/dataset";
 import { cn } from "@/lib/utils";
 import type { DataModel, DatasetRelationship } from "@/lib/data-model/types";
@@ -32,7 +32,7 @@ const pieChartTypes: ChartTypeOption[] = [
   { value: "donut", label: "Dona" },
 ];
 const scatterChartTypes: ChartTypeOption[] = [{ value: "scatter", label: "Dispersion" }];
-const tableChartTypes: ChartTypeOption[] = [{ value: "table", label: "Tabla" }];
+const tableChartTypes: ChartTypeOption[] = [{ value: "table", label: "Tabla" }, { value: "pivot_table", label: "Tabla dinamica" }];
 const scoreChartTypes: ChartTypeOption[] = [
   { value: "kpi", label: "KPI" },
   { value: "scorecard", label: "Scorecard" },
@@ -61,7 +61,7 @@ function compatibleTypes(type: WidgetType) {
 }
 
 export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
-  const { report, activePageId, selectedWidgetId, updateWidget, removeWidget, updateDataModel } = useEditorStore();
+  const { report, activePageId, selectedWidgetId, updateWidget, removeWidget, updateDataModel, updateReport, updatePage } = useEditorStore();
   const page = report.pages.find((item) => item.id === activePageId);
   const widget = page?.widgets.find((item) => item.id === selectedWidgetId);
   const dataset = report.datasets.find((item) => item.id === widget?.config.datasetId);
@@ -80,6 +80,20 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
         </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
           <p className="text-sm text-muted-foreground">No hay componente seleccionado.</p>
+          <FilterControls
+            title="Filtros del reporte"
+            filters={report.filters ?? []}
+            columns={report.datasets[0] ? getVisibleDatasetColumns(report.datasets[0]) : []}
+            onChange={(filters) => updateReport({ filters })}
+          />
+          {page ? (
+            <FilterControls
+              title="Filtros de pagina"
+              filters={page.filters ?? []}
+              columns={report.datasets[0] ? getVisibleDatasetColumns(report.datasets[0]) : []}
+              onChange={(filters) => updatePage(page.id, { filters })}
+            />
+          ) : null}
           <Separator />
           <DataModelControls reportDatasets={report.datasets} dataModel={dataModel} updateDataModel={updateDataModel} />
         </div>
@@ -102,6 +116,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
   const isPie = pieTypes.has(widget.type);
   const isCartesian = cartesianTypes.has(widget.type);
   const isTable = tableTypes.has(widget.type);
+  const isPivot = widget.type === "pivot_table";
   const isControl = widget.type.startsWith("control");
   const showDataSource = isScore || isScatter || isPie || isCartesian || isTable || isControl;
   const controlColumns = widget.type === "control_date" ? columns.filter((column) => column.type === "date") : columns;
@@ -233,7 +248,31 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
             </>
           ) : null}
 
-          {isTable ? (
+          {(isCartesian || isPie || isTable) ? (
+            <>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <Label>Filtro cruzado</Label>
+                <Switch checked={widget.config.enableCrossFilter ?? true} onCheckedChange={(enableCrossFilter) => setConfig({ enableCrossFilter })} />
+              </div>
+              <ColumnList
+                label="Drill down"
+                values={widget.config.drillDimensions ?? []}
+                columns={dimensionColumns}
+                addLabel="Agregar nivel"
+                onChange={(drillDimensions) => setConfig({ drillDimensions, drillLevel: 0, dimension: drillDimensions[0] ?? widget.config.dimension, dimensions: drillDimensions[0] ? [drillDimensions[0]] : widget.config.dimensions })}
+              />
+              <ColumnList
+                label="Metricas opcionales"
+                values={(widget.config.optionalMetrics ?? []).map(metricKey)}
+                columns={metricColumns}
+                addLabel="Agregar metrica opcional"
+                onChange={(optionalMetrics) => setConfig({ optionalMetrics, activeOptionalMetric: optionalMetrics[0] })}
+              />
+            </>
+          ) : null}
+
+          {isTable && !isPivot ? (
             <>
               <ColumnList
                 label="Columnas"
@@ -242,6 +281,33 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
                 addLabel="Agregar columna"
                 onChange={(dimensions) => setConfig({ dimensions, dimension: dimensions[0] })}
               />
+              <LimitField value={widget.config.limit} onChange={(limit) => setConfig({ limit })} />
+            </>
+          ) : null}
+
+          {isPivot ? (
+            <>
+              <ColumnList
+                label="Filas"
+                values={widget.config.dimensions?.slice(0, 1) ?? []}
+                columns={dimensionColumns}
+                addLabel="Agregar fila"
+                onChange={(rows) => setConfig({ dimensions: [rows[0], widget.config.dimensions?.[1]].filter(Boolean) as string[], dimension: rows[0] })}
+              />
+              <SingleColumnSelect
+                label="Columnas"
+                value={widget.config.dimensions?.[1]}
+                columns={dimensionColumns}
+                onChange={(column) => setConfig({ dimensions: [widget.config.dimensions?.[0], column].filter(Boolean) as string[] })}
+              />
+              <ColumnList
+                label="Metricas"
+                values={selectedMetrics}
+                columns={metricColumns}
+                addLabel="Agregar metrica"
+                onChange={(metrics) => setConfig({ metrics, metric: metrics[0], aggregation: suggestedAggregation(metrics[0]) })}
+              />
+              <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
               <LimitField value={widget.config.limit} onChange={(limit) => setConfig({ limit })} />
             </>
           ) : null}
@@ -294,6 +360,78 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
+}
+
+function FilterControls({
+  title,
+  filters,
+  columns,
+  onChange,
+}: {
+  title: string;
+  filters: WidgetFilter[];
+  columns: ColumnOption[];
+  onChange: (filters: WidgetFilter[]) => void;
+}) {
+  const addFilter = () => {
+    const column = columns[0];
+    if (!column) return;
+    onChange([...filters, { column: column.name, operator: "equals", value: "" }]);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <Button variant="outline" size="sm" onClick={addFilter} disabled={!columns.length}>
+          <Plus className="mr-2 h-4 w-4" />
+          Filtro
+        </Button>
+      </div>
+      {filters.length === 0 ? <p className="text-xs text-muted-foreground">Sin filtros.</p> : null}
+      {filters.map((filter, index) => (
+        <div key={`${filter.column}-${index}`} className="space-y-2 rounded-md border border-[var(--dh-border)] p-2">
+          <SingleColumnSelect
+            label="Campo"
+            value={filter.column}
+            columns={columns}
+            onChange={(column) => {
+              const next = [...filters];
+              next[index] = { ...filter, column: column ?? filter.column };
+              onChange(next);
+            }}
+          />
+          <Select value={filter.operator} onValueChange={(operator) => {
+            const next = [...filters];
+            next[index] = { ...filter, operator: operator as WidgetFilter["operator"] };
+            onChange(next);
+          }}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="equals">Igual</SelectItem>
+              <SelectItem value="notEquals">Distinto</SelectItem>
+              <SelectItem value="contains">Contiene</SelectItem>
+              <SelectItem value="notContains">No contiene</SelectItem>
+              <SelectItem value="gte">Mayor o igual</SelectItem>
+              <SelectItem value="lte">Menor o igual</SelectItem>
+              <SelectItem value="isNull">Vacio</SelectItem>
+              <SelectItem value="notNull">No vacio</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex gap-2">
+            <Input value={String(Array.isArray(filter.value) ? filter.value[0] : filter.value ?? "")} onChange={(event) => {
+              const next = [...filters];
+              next[index] = { ...filter, value: event.target.value };
+              onChange(next);
+            }} />
+            <Button variant="ghost" size="icon-sm" className="text-destructive" onClick={() => onChange(filters.filter((_, itemIndex) => itemIndex !== index))}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function getDimensionColumns(datasets: Dataset[], dataModel: DataModel, baseDatasetId?: string): ColumnOption[] {

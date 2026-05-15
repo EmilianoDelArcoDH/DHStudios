@@ -30,6 +30,7 @@ const chartItems: { type: WidgetType; label: string; icon: React.ElementType }[]
   { type: "combo", label: "Combo", icon: BarChart3 },
   { type: "scatter", label: "Dispersión", icon: ScatterChart },
   { type: "table", label: "Tabla", icon: Table2 },
+  { type: "pivot_table", label: "Tabla dinamica", icon: Table2 },
   { type: "scorecard", label: "Scorecard", icon: LayoutTemplate },
 ];
 
@@ -86,11 +87,11 @@ export function ToolBar({ onAddData }: { onAddData?: () => void }) {
 
   return (
     <div className="dh-toolbar flex h-11 shrink-0 items-center gap-1 overflow-x-auto border-b px-2">
-      {/* <ToolbarIcon label="Deshacer" onClick={undo}><Undo2 className="h-4 w-4" /></ToolbarIcon>
+      <ToolbarIcon label="Deshacer" onClick={undo}><Undo2 className="h-4 w-4" /></ToolbarIcon>
       <ToolbarIcon label="Rehacer" onClick={redo}><Redo2 className="h-4 w-4" /></ToolbarIcon>
       <Separator orientation="vertical" className="mx-1 h-6" />
       <ToolbarIcon label="Seleccionar" onClick={() => undefined}><MousePointer2 className="h-4 w-4" /></ToolbarIcon>
-      <Separator orientation="vertical" className="mx-1 h-6" /> */}
+      <Separator orientation="vertical" className="mx-1 h-6" />
       <ZoomControl selectedZoom={selectedZoom} setZoom={setZoom} />
       <Separator orientation="vertical" className="mx-1 h-6" />
       <Button variant="ghost" size="sm" onClick={addPage}>
@@ -194,6 +195,7 @@ export function ToolBar({ onAddData }: { onAddData?: () => void }) {
             <DropdownMenuLabel>Herramientas</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => addWidget("kpi")}>Añadir KPI</DropdownMenuItem>
             <DropdownMenuItem onClick={() => addWidget("table")}>Añadir tabla</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => addWidget("pivot_table")}>Añadir tabla dinamica</DropdownMenuItem>
             <DropdownMenuItem disabled>Insertar codigo</DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>

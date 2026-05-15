@@ -14,6 +14,7 @@ type DbReport = {
   name: string;
   is_public: boolean;
   theme: Report["theme"];
+  data_model?: Report["dataModel"] | null;
   created_at: string;
   updated_at: string;
 };
@@ -35,6 +36,8 @@ type DbDataset = {
   source_type: Dataset["sourceType"];
   source_url?: string | null;
   columns: Dataset["columns"];
+  column_config?: Dataset["columnConfig"] | null;
+  calculated_fields?: Dataset["calculatedFields"] | null;
   rows: Dataset["rows"];
   created_at: string;
   updated_at: string;
@@ -71,6 +74,7 @@ function mapReport(report: DbReport, pages: DbPage[], datasets: DbDataset[], wid
     name: report.name,
     isPublic: report.is_public,
     theme: report.theme,
+    dataModel: report.data_model ?? { relationships: [] },
     datasets: datasets.map((dataset) => ({
       id: dataset.id,
       projectId: dataset.project_id,
@@ -79,6 +83,8 @@ function mapReport(report: DbReport, pages: DbPage[], datasets: DbDataset[], wid
       sourceType: dataset.source_type,
       sourceUrl: dataset.source_url,
       columns: dataset.columns,
+      columnConfig: dataset.column_config ?? undefined,
+      calculatedFields: dataset.calculated_fields ?? [],
       rows: dataset.rows,
       createdAt: dataset.created_at,
       updatedAt: dataset.updated_at,
@@ -161,9 +167,11 @@ export const reportService = {
       name: report.name,
       is_public: report.isPublic,
       theme: report.theme,
+      data_model: report.dataModel ?? { relationships: [] },
       updated_at: new Date().toISOString(),
     }, { onConflict: "project_id" });
     if (error) throw error;
+    await this.deleteMissingChildren(report);
     await Promise.all([
       ...report.pages.map((page) => this.savePage(page)),
       ...report.datasets.map((dataset) => this.saveDataset(report.projectId, dataset)),
@@ -210,13 +218,43 @@ export const reportService = {
       id: dataset.id,
       project_id: projectId,
       name: dataset.name,
-      source_type: dataset.sourceType,
+      source_type: dataset.sourceType === "unknown" ? "manual" : dataset.sourceType,
       source_url: dataset.sourceUrl,
       columns: dataset.columns,
+      column_config: dataset.columnConfig ?? [],
+      calculated_fields: dataset.calculatedFields ?? [],
       rows: dataset.rows,
       updated_at: new Date().toISOString(),
     });
     if (error) throw error;
     return dataset;
+  },
+
+  async deleteMissingChildren(report: Report) {
+    if (!enabled()) return;
+
+    const supabase = createClient();
+    const pageIds = report.pages.map((page) => page.id);
+    const datasetIds = report.datasets.map((dataset) => dataset.id);
+    const widgetIds = report.pages.flatMap((page) => page.widgets.map((widget) => widget.id));
+
+    const deletions = [];
+    if (pageIds.length) {
+      deletions.push(supabase.from("report_pages").delete().eq("project_id", report.projectId).not("id", "in", `(${pageIds.join(",")})`));
+    }
+    if (datasetIds.length) {
+      deletions.push(supabase.from("datasets").delete().eq("project_id", report.projectId).not("id", "in", `(${datasetIds.join(",")})`));
+    } else {
+      deletions.push(supabase.from("datasets").delete().eq("project_id", report.projectId));
+    }
+    if (widgetIds.length) {
+      deletions.push(supabase.from("widgets").delete().eq("project_id", report.projectId).not("id", "in", `(${widgetIds.join(",")})`));
+    } else {
+      deletions.push(supabase.from("widgets").delete().eq("project_id", report.projectId));
+    }
+
+    const results = await Promise.all(deletions);
+    const failed = results.find((result) => result.error);
+    if (failed?.error) throw failed.error;
   },
 };

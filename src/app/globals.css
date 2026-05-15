@@ -189,8 +189,101 @@
   border-radius: 6px;
 }
 
-.react-resizable-handle {
-  opacity: 0.45;
+.react-grid-item > .react-resizable-handle {
+  z-index: 25;
+  opacity: 0 !important;
+  background-image: none;
+  box-sizing: border-box;
+  padding: 0;
+  transition: opacity 100ms ease;
+}
+
+.react-grid-item:hover > .react-resizable-handle {
+  opacity: 0 !important;
+}
+
+.dh-widget-selected {
+  border-color: transparent !important;
+  outline: 1px dashed var(--primary);
+  outline-offset: -1px;
+}
+
+.react-grid-item.dh-widget-selected > .react-resizable-handle {
+  opacity: 1 !important;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  display: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-ne,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-nw,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-se,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-sw,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-n,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-s,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-e,
+.react-grid-item > .react-resizable-handle.react-resizable-handle-w {
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 1px;
+  height: 5px !important;
+  margin: 0;
+  padding: 0;
+  transform: none;
+  width: 5px !important;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-n {
+  left: 50%;
+  margin-left: -2.5px;
+  top: -3px;
+  transform: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-s {
+  bottom: -3px;
+  left: 50%;
+  margin-left: -2.5px;
+  transform: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-e {
+  margin-top: -2.5px;
+  right: -3px;
+  top: 50%;
+  transform: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-w {
+  left: -3px;
+  margin-top: -2.5px;
+  top: 50%;
+  transform: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-ne {
+  right: -3px;
+  top: -3px;
+  transform: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-nw {
+  left: -3px;
+  top: -3px;
+  transform: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-se {
+  bottom: -3px;
+  right: -3px;
+  transform: none;
+}
+
+.react-grid-item > .react-resizable-handle.react-resizable-handle-sw {
+  bottom: -3px;
+  left: -3px;
+  transform: none;
 }
 
 .dh-workspace {

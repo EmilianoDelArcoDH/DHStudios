@@ -14,6 +14,7 @@ const fixedGridCompactor = getCompactor(null, false, true);
 const gridConfig = { cols: 12, rowHeight: 42, margin: [12, 12] as const, containerPadding: [12, 12] as const };
 const canvasWidth = 1120;
 const snapThreshold = 0.75;
+const resizeHandles = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 
 type SmartGuide = { orientation: "vertical" | "horizontal"; position: number };
 
@@ -25,6 +26,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
     mode,
     zoom,
     controlValues,
+    interactionFilters,
     selectWidget,
     updateWidgetLayouts,
     duplicateWidget,
@@ -106,16 +108,27 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
             layout={layouts}
             gridConfig={gridConfig}
             dragConfig={{ enabled: mode === "edit", threshold: 10, handle: ".widget-drag-handle", cancel: ".widget-no-drag, .widget-locked" }}
-            resizeConfig={{ enabled: mode === "edit", handles: ["se"] }}
+            resizeConfig={{ enabled: mode === "edit", handles: resizeHandles }}
             compactor={fixedGridCompactor}
             onDrag={updateSmartGuides}
             onDragStop={commitLayout}
+            onResize={updateSmartGuides}
             onResizeStop={commitLayout}
           >
             {page.widgets.map((widget, index) => {
               const dataset = report.datasets.find((item) => item.id === widget.config.datasetId);
               const selected = !preview && selectedWidgetId === widget.id && mode === "edit";
-              const globalFilters = filtersForWidget(widget, page.widgets, controlValues);
+              const globalFilters = [
+                ...(report.filters ?? []),
+                ...(page.filters ?? []),
+                ...filtersForWidget(widget, page.widgets, controlValues),
+                ...Object.entries(interactionFilters)
+                  .filter(([sourceWidgetId]) => {
+                    const source = page.widgets.find((item) => item.id === sourceWidgetId);
+                    return sourceWidgetId !== widget.id && source?.config.datasetId === widget.config.datasetId;
+                  })
+                  .map(([, filter]) => filter),
+              ];
               const showTitle = widget.style.showTitle ?? widget.type !== "image";
               const hasCanvasTitle = showTitle && widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type);
               return (
@@ -126,7 +139,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
                     if (preview) return;
                     selectWidget(widget.id);
                   }}
-                  className={cn("dh-widget relative overflow-hidden", preview ? "border-transparent shadow-none" : "border", selected && "ring-2 ring-primary")}
+                  className={cn("dh-widget relative overflow-hidden", preview ? "border-transparent shadow-none" : "border", selected && "dh-widget-selected")}
                   style={{ background: widget.style.background, borderColor: widget.style.borderColor, borderRadius: widget.style.borderRadius, zIndex: index + 1 }}
                 >
                   {selected ? (

@@ -112,8 +112,9 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
     setShareOpen(true);
     try {
       setShareState("sharing");
+      const publishedReport = { ...report, isPublic: true, updatedAt: new Date().toISOString() };
       updateReport({ isPublic: true });
-      await autosave();
+      await reportService.saveReport(publishedReport);
       setShareState("idle");
     } catch {
       setShareState("error");

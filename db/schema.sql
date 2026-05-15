@@ -7,6 +7,7 @@ create table if not exists public.reports (
   name text not null,
   is_public boolean not null default false,
   theme jsonb not null default '{}'::jsonb,
+  data_model jsonb not null default '{"relationships":[]}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -25,9 +26,11 @@ create table if not exists public.datasets (
   project_id uuid not null references public.reports(project_id) on delete cascade,
   owner_id uuid references auth.users(id) on delete set null default auth.uid(),
   name text not null,
-  source_type text not null check (source_type in ('csv', 'google_sheets', 'manual')),
+  source_type text not null check (source_type in ('csv', 'google_sheets', 'manual', 'unknown')),
   source_url text,
   columns jsonb not null default '[]'::jsonb,
+  column_config jsonb not null default '[]'::jsonb,
+  calculated_fields jsonb not null default '[]'::jsonb,
   rows jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -44,6 +47,12 @@ create table if not exists public.widgets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.reports add column if not exists data_model jsonb not null default '{"relationships":[]}'::jsonb;
+alter table public.datasets add column if not exists column_config jsonb not null default '[]'::jsonb;
+alter table public.datasets add column if not exists calculated_fields jsonb not null default '[]'::jsonb;
+alter table public.datasets drop constraint if exists datasets_source_type_check;
+alter table public.datasets add constraint datasets_source_type_check check (source_type in ('csv', 'google_sheets', 'manual', 'unknown'));
 
 create index if not exists reports_owner_idx on public.reports(owner_id);
 create index if not exists report_pages_project_idx on public.report_pages(project_id);
