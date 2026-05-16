@@ -1,17 +1,43 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BarChart3, BringToFront, Copy, Lock, MoreHorizontal, Plus, SendToBack, Trash2, Unlock } from "lucide-react";
-import { getCompactor, GridLayout, type Layout, type LayoutItem } from "react-grid-layout";
+import {
+  BarChart3,
+  BringToFront,
+  Copy,
+  Lock,
+  MoreHorizontal,
+  Plus,
+  SendToBack,
+  Trash2,
+  Unlock,
+} from "lucide-react";
+import {
+  getCompactor,
+  GridLayout,
+  type Layout,
+  type LayoutItem,
+} from "react-grid-layout";
 import { useEditorStore } from "@/store/editor-store";
 import { ChartRenderer } from "@/components/charts/chart-renderer";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { ReportWidget, WidgetFilter } from "@/types";
 
 const fixedGridCompactor = getCompactor(null, false, true);
-const gridConfig = { cols: 12, rowHeight: 42, margin: [12, 12] as const, containerPadding: [12, 12] as const };
+const gridConfig = {
+  cols: 12,
+  rowHeight: 42,
+  margin: [12, 12] as const,
+  containerPadding: [12, 12] as const,
+};
 const canvasWidth = 1120;
 const snapThreshold = 0.75;
 const resizeHandles = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
@@ -37,7 +63,8 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
     addWidget,
   } = useEditorStore();
   const [smartGuides, setSmartGuides] = useState<SmartGuide[]>([]);
-  const page = report.pages.find((item) => item.id === activePageId) ?? report.pages[0];
+  const page =
+    report.pages.find((item) => item.id === activePageId) ?? report.pages[0];
   const layouts = useMemo(
     () =>
       page.widgets.map((widget) => ({
@@ -59,7 +86,11 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
     setSmartGuides((current) => {
       if (
         current.length === nextGuides.length &&
-        current.every((guide, index) => guide.orientation === nextGuides[index]?.orientation && guide.position === nextGuides[index]?.position)
+        current.every(
+          (guide, index) =>
+            guide.orientation === nextGuides[index]?.orientation &&
+            guide.position === nextGuides[index]?.position,
+        )
       ) {
         return current;
       }
@@ -68,29 +99,58 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
     });
   };
 
-  const updateSmartGuides = (layout: Layout, _oldItem: LayoutItem | null, newItem: LayoutItem | null) => {
+  const updateSmartGuides = (
+    layout: Layout,
+    _oldItem: LayoutItem | null,
+    newItem: LayoutItem | null,
+  ) => {
     if (mode !== "edit" || preview || !newItem) return;
     setGuidesIfChanged(findSmartGuides(layout, newItem));
   };
 
   const clearSmartGuides = () => setGuidesIfChanged([]);
 
-  const commitLayout = (layout: Layout, _oldItem?: LayoutItem | null, newItem?: LayoutItem | null) => {
+  const commitLayout = (
+    layout: Layout,
+    _oldItem?: LayoutItem | null,
+    newItem?: LayoutItem | null,
+  ) => {
     if (mode !== "edit") return;
-    const snappedLayout = newItem ? snapLayoutToGuides(layout, newItem) : layout;
-    updateWidgetLayouts(snappedLayout.map((item) => ({ i: item.i, x: item.x, y: item.y, w: item.w, h: item.h })));
+    const snappedLayout = newItem
+      ? snapLayoutToGuides(layout, newItem)
+      : layout;
+    updateWidgetLayouts(
+      snappedLayout.map((item) => ({
+        i: item.i,
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+      })),
+    );
     clearSmartGuides();
   };
 
   return (
-    <main className={cn("dh-workspace flex min-w-0 flex-1 overflow-auto", preview ? "p-4" : "p-8")}>
+    <main
+      className={cn(
+        "dh-workspace flex min-w-0 flex-1 overflow-auto",
+        preview ? "p-4" : "p-8",
+      )}
+    >
       <div
-        className={cn("dh-canvas mx-auto min-h-[920px] w-[1120px] origin-top", preview ? "border-transparent shadow-none" : "border")}
+        className={cn(
+          "dh-canvas mx-auto min-h-[920px] w-[1120px] origin-top",
+          preview ? "border-transparent shadow-none" : "border",
+        )}
         style={{
           transform: `scale(${zoom})`,
           backgroundColor: report.theme.pageBackground,
           color: report.theme.text,
-          backgroundImage: mode === "edit" ? "linear-gradient(var(--dh-gray-ui) 1px, transparent 1px), linear-gradient(90deg, var(--dh-gray-ui) 1px, transparent 1px)" : undefined,
+          backgroundImage:
+            mode === "edit"
+              ? "radial-gradient(circle, var(--dh-border) 1px, transparent 1px)"
+              : undefined,
           backgroundSize: "24px 24px",
         }}
         onClick={() => {
@@ -101,70 +161,120 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
           <EmptyCanvas onAddChart={() => addWidget("bar")} />
         ) : (
           <div className="relative min-h-[920px]">
-          <SmartGuideOverlay guides={smartGuides} />
-          <GridLayout
-            className="min-h-[920px]"
-            width={canvasWidth}
-            layout={layouts}
-            gridConfig={gridConfig}
-            dragConfig={{ enabled: mode === "edit", threshold: 10, handle: ".widget-drag-handle", cancel: ".widget-no-drag, .widget-locked" }}
-            resizeConfig={{ enabled: mode === "edit", handles: resizeHandles }}
-            compactor={fixedGridCompactor}
-            onDrag={updateSmartGuides}
-            onDragStop={commitLayout}
-            onResize={updateSmartGuides}
-            onResizeStop={commitLayout}
-          >
-            {page.widgets.map((widget, index) => {
-              const dataset = report.datasets.find((item) => item.id === widget.config.datasetId);
-              const selected = !preview && selectedWidgetId === widget.id && mode === "edit";
-              const globalFilters = [
-                ...(report.filters ?? []),
-                ...(page.filters ?? []),
-                ...filtersForWidget(widget, page.widgets, controlValues),
-                ...Object.entries(interactionFilters)
-                  .filter(([sourceWidgetId]) => {
-                    const source = page.widgets.find((item) => item.id === sourceWidgetId);
-                    return sourceWidgetId !== widget.id && source?.config.datasetId === widget.config.datasetId;
-                  })
-                  .map(([, filter]) => filter),
-              ];
-              const showTitle = widget.style.showTitle ?? widget.type !== "image";
-              const hasCanvasTitle = showTitle && widget.style.title && !["scorecard", "kpi", "text"].includes(widget.type);
-              return (
-                <section
-                  key={widget.id}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (preview) return;
-                    selectWidget(widget.id);
-                  }}
-                  className={cn("dh-widget relative overflow-hidden", preview ? "border-transparent shadow-none" : "border", selected && "dh-widget-selected")}
-                  style={{ background: widget.style.background, borderColor: widget.style.borderColor, borderRadius: widget.style.borderRadius, zIndex: index + 1 }}
-                >
-                  {selected ? (
-                    <WidgetFloatingToolbar
-                      widget={widget}
-                      onDuplicate={() => duplicateWidget(widget.id)}
-                      onRemove={() => removeWidget(widget.id)}
-                      onToggleLocked={() => toggleWidgetLocked(widget.id)}
-                      onBringToFront={() => bringWidgetToFront(widget.id)}
-                      onSendToBack={() => sendWidgetToBack(widget.id)}
-                    />
-                  ) : null}
-                  {mode === "edit" ? (
-                    <div className={cn("widget-drag-handle flex h-5 items-center justify-center border-b border-[var(--dh-border)] bg-background/90 text-[10px] font-semibold text-muted-foreground", widget.locked ? "widget-locked cursor-default" : "cursor-grab active:cursor-grabbing", !selected && "opacity-0")}>
-                      {widget.locked ? "bloqueado" : "mover"}
+            <SmartGuideOverlay guides={smartGuides} />
+            <GridLayout
+              className="min-h-[920px]"
+              width={canvasWidth}
+              layout={layouts}
+              gridConfig={gridConfig}
+              dragConfig={{
+                enabled: mode === "edit",
+                threshold: 10,
+                handle: ".dh-widget-drag-handle",
+                cancel: ".widget-no-drag, .widget-locked",
+              }}
+              resizeConfig={{
+                enabled: mode === "edit",
+                handles: resizeHandles,
+              }}
+              compactor={fixedGridCompactor}
+              onDrag={updateSmartGuides}
+              onDragStop={commitLayout}
+              onResize={updateSmartGuides}
+              onResizeStop={commitLayout}
+            >
+              {page.widgets.map((widget, index) => {
+                const dataset = report.datasets.find(
+                  (item) => item.id === widget.config.datasetId,
+                );
+                const selected =
+                  !preview && selectedWidgetId === widget.id && mode === "edit";
+                const globalFilters = [
+                  ...(report.filters ?? []),
+                  ...(page.filters ?? []),
+                  ...filtersForWidget(widget, page.widgets, controlValues),
+                  ...Object.entries(interactionFilters)
+                    .filter(([sourceWidgetId]) => {
+                      const source = page.widgets.find(
+                        (item) => item.id === sourceWidgetId,
+                      );
+                      return (
+                        sourceWidgetId !== widget.id &&
+                        source?.config.datasetId === widget.config.datasetId
+                      );
+                    })
+                    .map(([, filter]) => filter),
+                ];
+                const showTitle =
+                  widget.style.showTitle ?? widget.type !== "image";
+                const hasCanvasTitle =
+                  showTitle &&
+                  widget.style.title &&
+                  !["scorecard", "kpi", "text"].includes(widget.type);
+                return (
+                  <section
+                    key={widget.id}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (preview) return;
+                      selectWidget(widget.id);
+                    }}
+                    className={cn(
+                      "dh-widget group relative overflow-hidden transition-shadow hover:shadow-md",
+                      preview ? "border-transparent shadow-none" : "border",
+                      selected && "dh-widget-selected",
+                    )}
+                    style={{
+                      background: widget.style.background,
+                      borderColor: widget.style.borderColor,
+                      borderRadius: widget.style.borderRadius,
+                      zIndex: index + 1,
+                    }}
+                  >
+                    {selected ? (
+                      <WidgetFloatingToolbar
+                        widget={widget}
+                        onDuplicate={() => duplicateWidget(widget.id)}
+                        onRemove={() => removeWidget(widget.id)}
+                        onToggleLocked={() => toggleWidgetLocked(widget.id)}
+                        onBringToFront={() => bringWidgetToFront(widget.id)}
+                        onSendToBack={() => sendWidgetToBack(widget.id)}
+                      />
+                    ) : null}
+                    {hasCanvasTitle ? (
+                      <div className="dh-widget-drag-handle h-8 cursor-move px-3 pt-2 text-sm font-semibold">
+                        {widget.style.title}
+                      </div>
+                    ) : null}
+                    {mode === "edit" && !preview && !widget.locked ? (
+                      <div
+                        className={cn(
+                          "dh-widget-drag-handle absolute inset-x-2 top-1 z-10 h-3 cursor-move rounded-full opacity-0 transition-opacity group-hover:bg-muted-foreground/20 group-hover:opacity-100",
+                          selected && "bg-primary/25 opacity-100",
+                          hasCanvasTitle && "hidden",
+                        )}
+                        title="Mover widget"
+                        aria-hidden
+                      />
+                    ) : null}
+                    <div
+                      className={cn(
+                        "h-full",
+                        hasCanvasTitle && "h-[calc(100%-2rem)]",
+                      )}
+                    >
+                      <ChartRenderer
+                        widget={widget}
+                        dataset={dataset}
+                        datasets={report.datasets}
+                        dataModel={report.dataModel}
+                        globalFilters={globalFilters}
+                      />
                     </div>
-                  ) : null}
-                  {hasCanvasTitle ? <div className="widget-no-drag h-8 px-3 pt-2 text-sm font-semibold">{widget.style.title}</div> : null}
-                  <div className={cn("widget-no-drag h-full", mode === "edit" && "h-[calc(100%-1.25rem)]", hasCanvasTitle && "h-[calc(100%-2rem)]", mode === "edit" && hasCanvasTitle && "h-[calc(100%-3.25rem)]")}>
-                      <ChartRenderer widget={widget} dataset={dataset} datasets={report.datasets} dataModel={report.dataModel} globalFilters={globalFilters} />
-                  </div>
-                </section>
-              );
-            })}
-          </GridLayout>
+                  </section>
+                );
+              })}
+            </GridLayout>
           </div>
         )}
       </div>
@@ -172,12 +282,20 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
   );
 }
 
-function filtersForWidget(widget: ReportWidget, widgets: ReportWidget[], controlValues: Record<string, string | [string, string] | undefined>): WidgetFilter[] {
+function filtersForWidget(
+  widget: ReportWidget,
+  widgets: ReportWidget[],
+  controlValues: Record<string, string | [string, string] | undefined>,
+): WidgetFilter[] {
   if (widget.type.startsWith("control") || !widget.config.datasetId) return [];
 
   return widgets.flatMap<WidgetFilter>((control) => {
     if (!control.type.startsWith("control")) return [];
-    if (control.config.datasetId !== widget.config.datasetId || !control.config.dimension) return [];
+    if (
+      control.config.datasetId !== widget.config.datasetId ||
+      !control.config.dimension
+    )
+      return [];
     const value = controlValues[control.id];
     if (!value) return [];
 
@@ -187,36 +305,39 @@ function filtersForWidget(widget: ReportWidget, widgets: ReportWidget[], control
     }
 
     if (Array.isArray(value) || String(value).trim() === "") return [];
-    return [{
-      column: control.config.dimension,
-      operator: control.type === "control_select" ? "equals" : "contains",
-      value,
-    }];
+    return [
+      {
+        column: control.config.dimension,
+        operator: control.type === "control_select" ? "equals" : "contains",
+        value,
+      },
+    ];
   });
 }
 
 function EmptyCanvas({ onAddChart }: { onAddChart: () => void }) {
   return (
-    <div className="flex h-[720px] items-center justify-center px-8 text-center">
-      <div className="max-w-sm rounded-md border border-dashed border-[var(--dh-border)] bg-background/85 p-6 shadow-sm">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <BarChart3 className="h-6 w-6" />
-        </div>
-        <h2 className="text-base font-semibold">Empeza tu informe</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Agrega un grafico al canvas y despues conectalo con una fuente de datos desde el panel de propiedades.
-        </p>
-        <Button
-          className="mt-4"
-          onClick={(event) => {
-            event.stopPropagation();
-            onAddChart();
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Agregar primer grafico
-        </Button>
+    <div className="m-8 flex h-full min-h-[400px] flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <BarChart3 className="h-6 w-6 text-muted-foreground" />
       </div>
+      <div>
+        <p className="text-sm font-medium text-foreground">Canvas vacío</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Hacé click en &quot;Añadir un gráfico&quot; para empezar
+        </p>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={(event) => {
+          event.stopPropagation();
+          onAddChart();
+        }}
+      >
+        <Plus className="mr-1.5 h-3.5 w-3.5" />
+        Añadir gráfico
+      </Button>
     </div>
   );
 }
@@ -241,11 +362,17 @@ function findSmartGuides(layout: Layout, activeItem: LayoutItem): SmartGuide[] {
   const guides: SmartGuide[] = [];
 
   if (snap?.verticalGuide !== undefined) {
-    guides.push({ orientation: "vertical", position: gridXToPixels(snap.verticalGuide) });
+    guides.push({
+      orientation: "vertical",
+      position: gridXToPixels(snap.verticalGuide),
+    });
   }
 
   if (snap?.horizontalGuide !== undefined) {
-    guides.push({ orientation: "horizontal", position: gridYToPixels(snap.horizontalGuide) });
+    guides.push({
+      orientation: "horizontal",
+      position: gridYToPixels(snap.horizontalGuide),
+    });
   }
 
   return guides;
@@ -274,7 +401,10 @@ function findSnap(layout: Layout, activeItem: LayoutItem) {
     for (const activeAnchor of activeXAnchors) {
       for (const target of targetXAnchors) {
         const distance = Math.abs(activeAnchor.value - target);
-        if (distance <= snapThreshold && (!bestX || distance < bestX.distance)) {
+        if (
+          distance <= snapThreshold &&
+          (!bestX || distance < bestX.distance)
+        ) {
           bestX = { distance, x: target - activeAnchor.offset, guide: target };
         }
       }
@@ -283,7 +413,10 @@ function findSnap(layout: Layout, activeItem: LayoutItem) {
     for (const activeAnchor of activeYAnchors) {
       for (const target of targetYAnchors) {
         const distance = Math.abs(activeAnchor.value - target);
-        if (distance <= snapThreshold && (!bestY || distance < bestY.distance)) {
+        if (
+          distance <= snapThreshold &&
+          (!bestY || distance < bestY.distance)
+        ) {
           bestY = { distance, y: target - activeAnchor.offset, guide: target };
         }
       }
@@ -291,13 +424,20 @@ function findSnap(layout: Layout, activeItem: LayoutItem) {
   }
 
   if (!bestX && !bestY) return undefined;
-  return { x: bestX?.x, y: bestY?.y, verticalGuide: bestX?.guide, horizontalGuide: bestY?.guide };
+  return {
+    x: bestX?.x,
+    y: bestY?.y,
+    verticalGuide: bestX?.guide,
+    horizontalGuide: bestY?.guide,
+  };
 }
 
 function gridXToPixels(value: number) {
   const [marginX] = gridConfig.margin;
   const [paddingX] = gridConfig.containerPadding;
-  const columnWidth = (canvasWidth - paddingX * 2 - marginX * (gridConfig.cols - 1)) / gridConfig.cols;
+  const columnWidth =
+    (canvasWidth - paddingX * 2 - marginX * (gridConfig.cols - 1)) /
+    gridConfig.cols;
   return paddingX + value * (columnWidth + marginX);
 }
 
@@ -342,7 +482,10 @@ function WidgetFloatingToolbar({
   onBringToFront: () => void;
   onSendToBack: () => void;
 }) {
-  const stopAndRun = (event: { stopPropagation: () => void }, action: () => void) => {
+  const stopAndRun = (
+    event: { stopPropagation: () => void },
+    action: () => void,
+  ) => {
     event.stopPropagation();
     action();
   };
@@ -357,7 +500,7 @@ function WidgetFloatingToolbar({
             aria-label="Acciones del widget"
             variant="outline"
             size="icon-sm"
-            className="widget-no-drag absolute right-2 top-2 z-20 bg-card/95 shadow-md"
+            className="widget-no-drag absolute right-2 top-2 z-20 bg-card/95 opacity-0 shadow-md transition-opacity group-hover:opacity-100 data-[state=open]:opacity-100"
             onClick={(event) => event.stopPropagation()}
           />
         }
@@ -370,19 +513,32 @@ function WidgetFloatingToolbar({
             <Copy className="h-4 w-4" />
             Duplicar
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={(event) => stopAndRun(event, onToggleLocked)}>
-            {widget.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+          <DropdownMenuItem
+            onClick={(event) => stopAndRun(event, onToggleLocked)}
+          >
+            {widget.locked ? (
+              <Unlock className="h-4 w-4" />
+            ) : (
+              <Lock className="h-4 w-4" />
+            )}
             {widget.locked ? "Desbloquear" : "Bloquear"}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={(event) => stopAndRun(event, onBringToFront)}>
+          <DropdownMenuItem
+            onClick={(event) => stopAndRun(event, onBringToFront)}
+          >
             <BringToFront className="h-4 w-4" />
             Traer al frente
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={(event) => stopAndRun(event, onSendToBack)}>
+          <DropdownMenuItem
+            onClick={(event) => stopAndRun(event, onSendToBack)}
+          >
             <SendToBack className="h-4 w-4" />
             Enviar atras
           </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onClick={(event) => stopAndRun(event, onRemove)}>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={(event) => stopAndRun(event, onRemove)}
+          >
             <Trash2 className="h-4 w-4" />
             Eliminar
           </DropdownMenuItem>

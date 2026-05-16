@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Eye, PanelLeftOpen, PanelRightOpen, Pencil } from "lucide-react";
-import { AuthPanel } from "@/components/auth/auth-panel";
+import { Eye, PanelLeftOpen, PanelRightOpen, Pencil, Plus } from "lucide-react";
 import { DataSourceManager } from "@/components/datasources/data-source-manager";
 import { ReportCanvas } from "@/components/editor/report-canvas";
 import { ToolBar } from "@/components/editor/tool-bar";
-import { TopBar } from "@/components/editor/top-bar";
+import { MenuBar, TopBar } from "@/components/editor/top-bar";
 import { LeftPanel } from "@/components/panels/left-panel";
 import { RightPanel } from "@/components/panels/right-panel";
 import { useAutosave } from "@/hooks/use-autosave";
@@ -22,7 +21,7 @@ type EditorView = "canvas" | "data-sources";
 
 export function EditorShell({ projectId, readonly = false }: { projectId: string; readonly?: boolean }) {
   useAutosave();
-  const { error, report, setReport, setMode, selectWidget } = useEditorStore();
+  const { error, report, activePageId, setReport, setMode, selectWidget, selectPage, addPage } = useEditorStore();
   const [loadState, setLoadState] = useState<"loading" | "ready" | "not-found" | "forbidden" | "error">("loading");
   const [loadError, setLoadError] = useState("");
   const [editorMode, setEditorMode] = useState<EditorMode>("edit");
@@ -129,6 +128,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
       ) : (
         <TopBar readonly={readonly} onPreview={enterPreview} />
       )}
+      {!readonly && !isPreview ? <MenuBar /> : null}
       {!readonly && !isPreview ? <ToolBar onAddData={() => {
         setManagedDatasetId(undefined);
         setEditorView("data-sources");
@@ -178,7 +178,6 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
               <PanelRightOpen className="h-4 w-4" />
             </Button>
           ) : null}
-          {!readonly && !isPreview ? <div className="hidden border-b bg-card p-2 xl:block"><AuthPanel /></div> : null}
           {editorView === "data-sources" && !isPresentationMode ? (
             <DataSourceManager key={managedDatasetId ?? "data-sources"} initialDatasetId={managedDatasetId} onClose={() => setEditorView("canvas")} />
           ) : (
@@ -194,6 +193,32 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
           </div>
         ) : null}
       </div>
+      {!isPresentationMode ? (
+        <nav className="dh-toolbar flex h-9 shrink-0 items-center gap-0 overflow-x-auto border-t">
+          {report.pages.map((page) => (
+            <button
+              key={page.id}
+              type="button"
+              className={cn(
+                "flex h-full items-center whitespace-nowrap border-r px-4 text-xs font-medium transition-colors hover:bg-muted",
+                activePageId === page.id ? "border-b-2 border-b-primary bg-background text-foreground" : "text-muted-foreground",
+              )}
+              onClick={() => selectPage(page.id)}
+            >
+              {page.name}
+            </button>
+          ))}
+          <button
+            type="button"
+            title="Agregar página"
+            aria-label="Agregar página"
+            onClick={addPage}
+            className="flex h-full w-9 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </nav>
+      ) : null}
     </div>
   );
 }

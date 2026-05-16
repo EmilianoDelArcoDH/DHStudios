@@ -1,6 +1,6 @@
 "use client";
 
-import { PanelRightClose, Plus, Trash2, X } from "lucide-react";
+import { PanelRightClose, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,9 +69,9 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
   if (!widget) {
     return (
-      <aside className="flex h-full w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--dh-border)] bg-card">
-        <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
-          <h2 className="text-sm font-semibold">Propiedades</h2>
+      <aside className="flex h-full w-80 shrink-0 flex-col overflow-hidden border-l border-border bg-card">
+        <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Propiedades</h2>
           {onCollapse ? (
             <Button title="Ocultar panel derecho" aria-label="Ocultar panel derecho" variant="ghost" size="icon" className="h-7 w-7" onClick={onCollapse}>
               <PanelRightClose className="h-4 w-4" />
@@ -133,9 +133,9 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
   };
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col border-l border-[var(--dh-border)] bg-card">
-      <div className="flex h-11 shrink-0 items-center justify-between border-b px-4">
-        <h2 className="text-sm font-semibold">Propiedades</h2>
+    <aside className="flex h-full w-80 shrink-0 flex-col overflow-hidden border-l border-border bg-card">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Propiedades</h2>
         {onCollapse ? (
           <Button title="Ocultar panel derecho" aria-label="Ocultar panel derecho" variant="ghost" size="icon" className="h-7 w-7" onClick={onCollapse}>
             <PanelRightClose className="h-4 w-4" />
@@ -143,12 +143,22 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
         ) : null}
       </div>
       <Tabs defaultValue="datos" className="flex min-h-0 flex-1 flex-col">
-        <TabsList className="m-3 grid grid-cols-2 rounded-md bg-[var(--dh-gray-ui)]">
-          <TabsTrigger value="datos">Datos</TabsTrigger>
-          <TabsTrigger value="estilo">Estilo</TabsTrigger>
+        <TabsList className="grid h-9 w-full grid-cols-2 rounded-none border-b bg-transparent p-0">
+          <TabsTrigger
+            value="datos"
+            className="h-full rounded-none border-b-2 border-transparent text-xs font-medium focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:border-primary data-active:bg-transparent data-active:text-primary data-active:shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            Datos
+          </TabsTrigger>
+          <TabsTrigger
+            value="estilo"
+            className="h-full rounded-none border-b-2 border-transparent text-xs font-medium focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:border-primary data-active:bg-transparent data-active:text-primary data-active:shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            Estilo
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="datos" className="h-0 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-4">
+        <TabsContent value="datos" className="dh-props-panel h-0 min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-contain pb-4">
           {typeOptions.length > 1 ? (
             <Field label="Tipo de grafico">
               <Select value={widget.type} onValueChange={(value) => updateWidget(widget.id, { type: value as WidgetType })}>
@@ -198,10 +208,8 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           {isScore ? (
             <>
-              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
               <SingleColumnSelect label="Metrica" value={widget.config.metric} columns={metricColumns} onChange={setSingleMetric} />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
-              <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
             </>
           ) : null}
 
@@ -315,8 +323,8 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
           <Button variant="destructive" className="w-full" onClick={() => removeWidget(widget.id)}><Trash2 className="mr-2 h-4 w-4" />Eliminar componente</Button>
         </TabsContent>
 
-        <TabsContent value="estilo" className="h-0 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 pb-4">
-          {!isText && !isImage && !isScore ? (
+        <TabsContent value="estilo" className="dh-props-panel h-0 min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-contain pb-4">
+          {!isText && !isImage ? (
             <>
               <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
               <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
@@ -383,8 +391,8 @@ function FilterControls({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">{title}</h3>
-        <Button variant="outline" size="sm" onClick={addFilter} disabled={!columns.length}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button variant="ghost" size="sm" className="mt-1 h-7 justify-start border border-dashed border-border px-2 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary" onClick={addFilter} disabled={!columns.length}>
+          <Plus className="mr-1.5 h-3 w-3" />
           Filtro
         </Button>
       </div>
@@ -515,8 +523,8 @@ function DataModelControls({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Modelo de datos</h3>
-        <Button variant="outline" size="sm" onClick={addRelationship} disabled={reportDatasets.length < 2}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button variant="ghost" size="sm" className="mt-1 h-7 justify-start border border-dashed border-border px-2 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary" onClick={addRelationship} disabled={reportDatasets.length < 2}>
+          <Plus className="mr-1.5 h-3 w-3" />
           Relacion
         </Button>
       </div>
@@ -608,19 +616,81 @@ function SingleColumnSelect({
   onChange: (value?: string) => void;
 }) {
   const selectedColumn = columns.find((column) => column.name === value);
+  const chipVariant = fieldChipVariant(label);
 
   return (
     <Field label={label}>
-      <Select value={value ?? EMPTY_SELECT_VALUE} onValueChange={(next) => onChange(!next || next === EMPTY_SELECT_VALUE ? undefined : next)}>
-        <SelectTrigger className="w-full min-w-0">
-          <span className="truncate text-left">{selectedColumn ? columnDisplayName(selectedColumn) : "Sin seleccion"}</span>
-        </SelectTrigger>
-        <SelectContent className="min-w-56">
-          <SelectItem value={EMPTY_SELECT_VALUE}>Sin seleccion</SelectItem>
-          {columns.map((column) => <SelectItem key={column.name} value={column.name}>{columnDisplayName(column)} - {column.type}</SelectItem>)}
-        </SelectContent>
-      </Select>
+      <div className="space-y-2">
+        {selectedColumn ? (
+          <FieldChip
+            variant={chipVariant}
+            label={chipVariant === "metric" ? `↗ ${columnDisplayName(selectedColumn)}` : `⊞ ${columnDisplayName(selectedColumn)}`}
+            onRemove={() => onChange(undefined)}
+          />
+        ) : null}
+        <Select value={EMPTY_SELECT_VALUE} onValueChange={(next) => onChange(!next || next === EMPTY_SELECT_VALUE ? undefined : next)}>
+          <SelectTrigger className="h-7 w-full min-w-0 justify-start rounded border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:border-primary/40 hover:text-primary">
+            <Plus className="mr-1.5 h-3 w-3" />
+            <span className="truncate text-left">{selectedColumn ? addLabelForField(label) : "Seleccionar"}</span>
+          </SelectTrigger>
+          <SelectContent className="min-w-56">
+            <SelectItem value={EMPTY_SELECT_VALUE}>Sin seleccion</SelectItem>
+            {columns.map((column) => <SelectItem key={column.name} value={column.name}>{columnDisplayName(column)} - {column.type}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
     </Field>
+  );
+}
+
+function fieldChipVariant(label: string): "metric" | "dimension" {
+  return normalizeColumnName(label).includes("metrica") ? "metric" : "dimension";
+}
+
+function addLabelForField(label: string) {
+  const normalized = normalizeColumnName(label);
+  if (normalized.includes("metrica")) return "Agregar métrica";
+  if (normalized.includes("dimension")) return "Agregar dimensión";
+  if (normalized.includes("filtro")) return "Agregar campo";
+  return `Agregar ${label.toLowerCase()}`;
+}
+
+function FieldChip({ variant, label, onRemove }: { variant: "metric" | "dimension"; label: string; onRemove: () => void }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium",
+        variant === "metric"
+          ? "border-primary/20 bg-primary/10 text-primary"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400",
+      )}
+    >
+      {label}
+      <button type="button" className="ml-0.5 opacity-60 hover:opacity-100" onClick={onRemove}>×</button>
+    </span>
+  );
+}
+
+function ColumnAddSelect({
+  addLabel,
+  columns,
+  onSelect,
+}: {
+  addLabel: string;
+  columns: ColumnOption[];
+  onSelect: (value?: string) => void;
+}) {
+  return (
+    <Select value={EMPTY_SELECT_VALUE} onValueChange={(next) => onSelect(!next || next === EMPTY_SELECT_VALUE ? undefined : next)}>
+      <SelectTrigger className="mt-1 h-7 w-full min-w-0 justify-start rounded border-dashed border-border bg-transparent px-2 text-xs text-muted-foreground shadow-none hover:border-primary/40 hover:text-primary">
+        <Plus className="mr-1.5 h-3 w-3" />
+        <span className="truncate text-left">{addLabel}</span>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={EMPTY_SELECT_VALUE}>Sin seleccion</SelectItem>
+        {columns.map((column) => <SelectItem key={column.name} value={column.name}>{column.label ?? column.name} - {column.type}</SelectItem>)}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -711,16 +781,60 @@ function BasicStyleControls({
   setStyle: (patch: Partial<WidgetStyle>) => void;
   compact?: boolean;
 }) {
+  const backgroundColors = ["#ffffff", "#f1f3f4", "#e8e8ff", "#e8f5e9", "#fff8e1", "#fce4ec", "#3333ff"];
+
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
-        {!compact ? <Field label="Texto"><Input type="color" value={style.color ?? "#1f2937"} onChange={(event) => setStyle({ color: event.target.value })} /></Field> : null}
-        <Field label="Fondo"><Input type="color" value={style.background ?? "#ffffff"} onChange={(event) => setStyle({ background: event.target.value })} /></Field>
-        <Field label="Borde"><Input type="color" value={style.borderColor ?? "#d7dce2"} onChange={(event) => setStyle({ borderColor: event.target.value })} /></Field>
-        {!compact ? <Field label="Tamano"><Input type="number" value={style.fontSize ?? 13} onChange={(event) => setStyle({ fontSize: Number(event.target.value) })} /></Field> : null}
-      </div>
-      <Field label="Radio de borde"><Input type="number" value={style.borderRadius ?? 4} onChange={(event) => setStyle({ borderRadius: Number(event.target.value) })} /></Field>
+      {!compact ? <Field label="Texto"><ColorInput value={style.color ?? "#1f2937"} onChange={(color) => setStyle({ color })} /></Field> : null}
+      <Field label="Color de fondo">
+        <div className="flex flex-wrap gap-2">
+          {backgroundColors.map((color) => (
+            <ColorSwatch key={color} color={color} selected={(style.background ?? "#ffffff").toLowerCase() === color.toLowerCase()} onClick={() => setStyle({ background: color })} />
+          ))}
+        </div>
+      </Field>
+      <Field label="Bordes">
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <span className="text-xs text-foreground">Color de borde</span>
+            <ColorInput value={style.borderColor ?? "#d7dce2"} onChange={(borderColor) => setStyle({ borderColor })} square />
+          </div>
+          {!compact ? (
+            <div className="space-y-1.5">
+              <span className="text-xs text-foreground">Tamaño</span>
+              <Input className="h-8 w-20" type="number" value={style.fontSize ?? 13} onChange={(event) => setStyle({ fontSize: Number(event.target.value) })} />
+            </div>
+          ) : null}
+          <div className="space-y-1.5">
+            <span className="text-xs text-foreground">Radio (px)</span>
+            <Input className="h-8 w-20" type="number" value={style.borderRadius ?? 4} onChange={(event) => setStyle({ borderRadius: Number(event.target.value) })} />
+          </div>
+        </div>
+      </Field>
     </>
+  );
+}
+
+function ColorSwatch({ color, selected, onClick }: { color: string; selected?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={`Color ${color}`}
+      className={cn("h-6 w-6 rounded-full border border-border transition-transform hover:scale-110", selected && "ring-2 ring-foreground ring-offset-1")}
+      style={{ background: color }}
+      onClick={onClick}
+    />
+  );
+}
+
+function ColorInput({ value, onChange, square = false }: { value: string; onChange: (value: string) => void; square?: boolean }) {
+  return (
+    <Input
+      type="color"
+      value={value}
+      className={cn("h-7 w-7 cursor-pointer p-0", square ? "rounded-sm" : "rounded-full")}
+      onChange={(event) => onChange(event.target.value)}
+    />
   );
 }
 
@@ -733,15 +847,14 @@ function SeriesColorControls({
 }) {
   return (
     <Field label="Colores de series">
-      <div className="grid grid-cols-6 gap-2">
+      <div className="flex flex-wrap gap-2">
         {colors.slice(0, 6).map((color, index) => (
-          <Input
+          <ColorInput
             key={`${index}-${color}`}
-            type="color"
             value={color}
-            onChange={(event) => {
+            onChange={(nextColor) => {
               const next = [...colors];
-              next[index] = event.target.value;
+              next[index] = nextColor;
               setStyle({ seriesColors: next });
             }}
           />
@@ -764,47 +877,34 @@ function ColumnList({
   addLabel: string;
   onChange: (values: string[]) => void;
 }) {
-  const rows = values.length ? values : [""];
+  const chipVariant = fieldChipVariant(label);
 
   return (
     <Field label={label}>
       <div className="space-y-2">
-        {rows.map((value, index) => (
-          <div key={`${label}-${index}`} className="flex items-center gap-2">
-            <Select
-              value={value || EMPTY_SELECT_VALUE}
-              onValueChange={(next) => {
-                const updated = [...values];
-                if (!next || next === EMPTY_SELECT_VALUE) updated.splice(index, 1);
-                else updated[index] = next;
-                onChange(updated);
-              }}
-            >
-              <SelectTrigger className="w-full min-w-0">
-                <span className="truncate text-left">{columnDisplayName(columns.find((column) => column.name === value))}</span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={EMPTY_SELECT_VALUE}>Sin seleccion</SelectItem>
-                {columns.map((column) => <SelectItem key={column.name} value={column.name}>{column.label ?? column.name} - {column.type}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {rows.length > 1 ? (
-              <Button variant="ghost" size="icon-sm" onClick={() => onChange(values.filter((_, itemIndex) => itemIndex !== index))}>
-                <X className="h-4 w-4" />
-              </Button>
-            ) : null}
+        {values.filter(Boolean).length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {values.filter(Boolean).map((value) => {
+              const column = columns.find((item) => item.name === value);
+              return (
+                <FieldChip
+                  key={`${label}-${value}`}
+                  variant={chipVariant}
+                  label={chipVariant === "metric" ? `↗ ${columnDisplayName(column)}` : `⊞ ${columnDisplayName(column)}`}
+                  onRemove={() => onChange(values.filter((item) => item !== value))}
+                />
+              );
+            })}
           </div>
-        ))}
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn("w-full", rows.some((value) => !value) && "opacity-60")}
-          onClick={() => onChange([...values, ""])}
-          disabled={columns.length === 0}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          {addLabel}
-        </Button>
+        ) : null}
+        <ColumnAddSelect
+          addLabel={addLabel}
+          columns={columns}
+          onSelect={(value) => {
+            if (!value) return;
+            onChange([...values.filter(Boolean), value]);
+          }}
+        />
       </div>
     </Field>
   );

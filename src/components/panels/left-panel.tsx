@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
-import { AreaChart, BarChart3, BringToFront, Copy, Database, FileText, Image as ImageIcon, Layers, LineChart, ListFilter, Lock, MoreHorizontal, PanelLeftClose, PieChart, Plus, ScatterChart, SendToBack, Table2, TextCursorInput, Trash2, Type, Unlock, Settings2 } from "lucide-react";
+import { AreaChart, BarChart3, BringToFront, Copy, FileText, Image as ImageIcon, LineChart, ListFilter, Lock, MoreHorizontal, PanelLeftClose, PieChart, Plus, ScatterChart, SendToBack, Table2, TextCursorInput, Trash2, Type, Unlock, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -49,43 +49,61 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
   };
 
   return (
-    <aside className="dh-panel flex h-full min-h-0 w-64 shrink-0 flex-col overflow-hidden border-r">
-      <div className="flex h-11 shrink-0 items-center justify-between border-b px-3">
-        <h2 className="text-sm font-semibold">Navegacion</h2>
-        {onCollapse ? (
-          <Button title="Ocultar panel izquierdo" aria-label="Ocultar panel izquierdo" variant="ghost" size="icon" className="h-7 w-7" onClick={onCollapse}>
+    <aside className="group/left-panel relative flex h-full min-h-0 w-64 shrink-0 flex-col overflow-hidden border-r bg-card">
+      {onCollapse ? (
+        <div className="pointer-events-none absolute right-1 top-1 z-20 opacity-0 transition-opacity group-hover/left-panel:opacity-100 focus-within:opacity-100">
+          <Button
+            title="Ocultar panel izquierdo"
+            aria-label="Ocultar panel izquierdo"
+            variant="ghost"
+            size="icon"
+            className="pointer-events-auto h-7 w-7 bg-card/90"
+            onClick={onCollapse}
+          >
             <PanelLeftClose className="h-4 w-4" />
           </Button>
-        ) : null}
-      </div>
-
-      <Tabs defaultValue="pages" className="flex min-h-0 flex-1 flex-col">
-        <TabsList className="m-3 grid grid-cols-2 rounded-md bg-[var(--dh-gray-ui)]">
-          <TabsTrigger value="pages">Paginas</TabsTrigger>
-          <TabsTrigger value="data">Datos</TabsTrigger>
+        </div>
+      ) : null}
+      <Tabs defaultValue="pages" className="flex min-h-0 flex-1 flex-col gap-0">
+        <TabsList className="grid h-9 w-full grid-cols-2 rounded-none border-b bg-transparent p-0">
+          <TabsTrigger
+            value="pages"
+            className="h-full rounded-none border-b-2 border-transparent text-xs font-medium focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:border-primary data-active:bg-transparent data-active:text-primary data-active:shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            Páginas
+          </TabsTrigger>
+          <TabsTrigger
+            value="data"
+            className="h-full rounded-none border-b-2 border-transparent text-xs font-medium focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none data-active:border-primary data-active:bg-transparent data-active:text-primary data-active:shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+          >
+            Datos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="pages" className="h-0 min-h-0 flex-1">
           <ScrollArea className="h-full overscroll-contain">
-            <div className="space-y-3 p-3 pt-0">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Paginas</h3>
-              <Button title="Agregar pagina" aria-label="Agregar pagina" variant="ghost" size="icon" className="h-7 w-7" onClick={addPage}>
-                <Plus className="h-4 w-4" />
-              </Button>
+            <div className="space-y-5 p-2 pt-4">
+              <div className="flex items-center justify-between px-1">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Páginas</h3>
+                <Button title="Agregar página" aria-label="Agregar página" variant="ghost" size="icon-xs" className="h-6 w-6 rounded-full" onClick={addPage}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {report.pages.map((page) => (
                   <div
                     key={page.id}
-                    className={cn("group flex items-center gap-1 rounded-md px-1 py-1 text-sm text-foreground hover:bg-card", activePageId === page.id && "bg-card shadow-sm ring-1 ring-[var(--dh-border)]")}
+                    className={cn(
+                      "group flex items-center gap-1 rounded-md px-1 py-1 text-sm text-foreground transition-colors hover:bg-muted",
+                      activePageId === page.id && "bg-primary/10 ring-1 ring-primary/20",
+                    )}
                   >
                     <button
                       type="button"
                       onClick={() => selectPage(page.id)}
-                      className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1 py-1 text-left"
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left"
                     >
-                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <PageThumb active={activePageId === page.id} />
                       {renamingPageId === page.id ? (
                         <Input
                           autoFocus
@@ -99,9 +117,9 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
                           }}
                         />
                       ) : (
-                        <span className="truncate">{page.name}</span>
+                        <span className={cn("truncate text-sm", activePageId === page.id ? "font-medium text-primary" : "text-foreground")}>{page.name}</span>
                       )}
-                      <Badge variant="secondary" className="ml-auto shrink-0">{page.widgets.length}</Badge>
+                      <Badge variant="secondary" className="ml-auto h-5 shrink-0 rounded-full bg-card px-1.5 text-[11px] text-muted-foreground">{page.widgets.length}</Badge>
                     </button>
                     <DropdownMenu>
                       <DropdownMenuTrigger
@@ -143,10 +161,10 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
                   </div>
                 ))}
               </div>
-              <div className="space-y-2 rounded-md border border-[var(--dh-border)] bg-card p-2">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between px-1">
-                  <h3 className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground"><Layers className="h-4 w-4" />Capas</h3>
-                  <Badge variant="outline">{layers.length}</Badge>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Capas</h3>
+                  <span className="text-xs text-muted-foreground">{layers.length}</span>
                 </div>
                 {layers.length === 0 ? (
                   <p className="px-1 py-2 text-xs text-muted-foreground">No hay componentes en esta pagina.</p>
@@ -167,21 +185,37 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
                   ))}
                 </div>
               </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Fuentes de datos</h3>
+                </div>
+                <div className="space-y-2">
+                  {report.datasets.map((dataset) => (
+                    <DatasetMiniCard
+                      key={dataset.id}
+                      name={dataset.name}
+                      rows={dataset.rows.length}
+                      columns={dataset.columns.length}
+                      onClick={() => onManageDataset?.(dataset.id)}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </ScrollArea>
         </TabsContent>
 
         <TabsContent value="data" className="h-0 min-h-0 flex-1">
           <ScrollArea className="h-full overscroll-contain">
-            <div className="space-y-3 p-3 pt-0">
-              <h3 className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground"><Database className="h-4 w-4" />Fuentes</h3>
+            <div className="space-y-3 p-3 pt-4">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Fuentes de datos</h3>
               <div className="space-y-2">
                 {report.datasets.map((dataset) => (
-                  <div key={dataset.id} className="rounded-md border border-[var(--dh-border)] bg-card p-2">
+                  <div key={dataset.id} className="rounded-md border border-border bg-card p-2.5 shadow-sm">
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium" title={dataset.name}>{dataset.name}</div>
-                        <div className="text-xs text-muted-foreground">{dataset.rows.length} filas - {dataset.columns.length} columnas</div>
+                        <div className="truncate text-sm font-medium text-foreground" title={dataset.name}>{dataset.name}</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">{dataset.rows.length} filas · {dataset.columns.length} cols</div>
                         <div className="text-[11px] text-muted-foreground">{formatDatasetDate(dataset.createdAt)}</div>
                       </div>
                       <Button
@@ -251,6 +285,17 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
   );
 }
 
+function PageThumb({ active }: { active: boolean }) {
+  return (
+    <span className="grid h-7 w-10 shrink-0 grid-cols-2 gap-0.5 rounded-sm border border-border bg-muted p-0.5">
+      <span className={cn("rounded-[1px] bg-muted-foreground/25", active && "bg-primary/35")} />
+      <span className="rounded-[1px] bg-muted-foreground/25" />
+      <span className="rounded-[1px] bg-muted-foreground/25" />
+      <span className={cn("rounded-[1px] bg-muted-foreground/25", active && "bg-primary/25")} />
+    </span>
+  );
+}
+
 function LayerRow({
   widget,
   selected,
@@ -273,16 +318,19 @@ function LayerRow({
   const label = widget.style.title || widgetLabel(widget.type);
 
   return (
-    <div className={cn("rounded-md border border-transparent p-1", selected && "border-primary bg-primary/5")}>
-      <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-background" onClick={onSelect}>
+    <div className={cn(
+      "group relative rounded-md border border-transparent transition-colors hover:bg-muted",
+      selected && "bg-primary/10",
+    )}>
+      <button type="button" className="flex w-full min-w-0 items-center gap-2 rounded px-2 py-1.5 text-left" onClick={onSelect}>
         {widgetIcon(widget.type)}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{label}</div>
-          <div className="text-[11px] text-muted-foreground">{widgetLabel(widget.type)}</div>
+          <div className={cn("truncate text-xs font-medium leading-4 text-foreground", selected && "text-primary")}>{label}</div>
+          <div className="text-[10px] leading-3 text-muted-foreground">{widgetLabel(widget.type)}</div>
         </div>
         {widget.locked ? <Lock className="h-3.5 w-3.5 text-muted-foreground" /> : null}
       </button>
-      <div className="mt-1 flex items-center justify-end gap-1">
+      <div className="absolute right-1 top-1 hidden items-center gap-0.5 bg-card group-hover:flex">
         <Button title={widget.locked ? "Desbloquear" : "Bloquear"} aria-label={widget.locked ? "Desbloquear" : "Bloquear"} variant="ghost" size="icon-xs" onClick={onToggleLocked}>
           {widget.locked ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
         </Button>
@@ -297,8 +345,23 @@ function LayerRow({
   );
 }
 
+function DatasetMiniCard({ name, rows, columns, onClick }: { name: string; rows: number; columns: number; onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      className="w-full rounded-md border border-border bg-card p-2 text-left shadow-sm transition-colors hover:bg-muted"
+      onClick={onClick}
+    >
+      <div className="truncate text-xs font-semibold text-foreground" title={name}>{name}</div>
+      <div className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+        {rows.toLocaleString("es-AR")} filas · {columns} columnas
+      </div>
+    </button>
+  );
+}
+
 function widgetIcon(type: WidgetType) {
-  const className = "h-4 w-4 shrink-0 text-muted-foreground";
+  const className = "h-3.5 w-3.5 shrink-0 text-muted-foreground";
   if (type === "pie" || type === "donut") return <PieChart className={className} />;
   if (type === "line" || type === "multi_line") return <LineChart className={className} />;
   if (type === "area") return <AreaChart className={className} />;
@@ -342,3 +405,5 @@ function formatDatasetDate(value?: string) {
   if (Number.isNaN(date.getTime())) return "Sin fecha de carga";
   return `Cargado ${date.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}`;
 }
+
+

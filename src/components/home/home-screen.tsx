@@ -51,17 +51,20 @@ export function HomeScreen() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--dh-gray-ui)] text-[var(--dh-black)]">
+    <main
+      className="min-h-screen bg-background text-foreground"
+      style={{ backgroundImage: "radial-gradient(circle, var(--dh-border) 1px, transparent 1px)", backgroundSize: "24px 24px" }}
+    >
       <section className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-6 py-12">
         <div className="grid w-full gap-8 md:grid-cols-[1fr_380px]">
           <div className="flex flex-col justify-center">
-            <div className="mb-5 h-2 w-24 rounded-sm bg-[var(--dh-blue)]" />
+            <div className="mb-4 h-0.5 w-16 rounded-full bg-primary" />
             <h1 className="max-w-xl text-4xl font-semibold tracking-normal text-[var(--dh-black)]">DH Studio</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--dh-gray-900)]">
               Creá y abrí reportes visuales con un projectId único. La estructura se mantiene familiar para estudiantes que ya conocen herramientas BI visuales.
             </p>
           </div>
-          <Card className="rounded-md border-[var(--dh-border)] bg-card shadow-sm">
+          <Card className="rounded-lg border-border bg-card shadow-md">
             <CardHeader><CardTitle className="text-lg">Proyectos</CardTitle></CardHeader>
             <CardContent className="space-y-5">
               <Button className="w-full" onClick={() => void createProject()} disabled={loading !== null}>

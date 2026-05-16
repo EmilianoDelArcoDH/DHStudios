@@ -53,20 +53,20 @@
 :root {
   color-scheme: light;
   --dh-white: #ffffff;
-  --dh-black: #000000;
+  --dh-black: #202124;
   --dh-blue: #3333ff;
   --dh-green: #00cc7e;
   --dh-yellow: #ffc51a;
   --dh-orange: #ff7059;
   --dh-pink: #ff76e2;
   --dh-lilac: #8a6df1;
-  --dh-gray-900: #333333;
-  --dh-gray-700: #666666;
-  --dh-gray-500: #999999;
-  --dh-gray-400: #b3b3b3;
-  --dh-gray-200: #e5e5e5;
-  --dh-gray-ui: #f4f5f7;
-  --dh-border: #d8dbe1;
+  --dh-gray-900: #3c4043;
+  --dh-gray-700: #5f6368;
+  --dh-gray-500: #80868b;
+  --dh-gray-400: #9aa0a6;
+  --dh-gray-200: #e8eaed;
+  --dh-gray-ui: #f1f3f4;
+  --dh-border: #dadce0;
 
   --background: var(--dh-white);
   --foreground: var(--dh-black);
@@ -203,9 +203,9 @@
 }
 
 .dh-widget-selected {
-  border-color: transparent !important;
-  outline: 1px dashed var(--primary);
-  outline-offset: -1px;
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 12%, transparent) !important;
 }
 
 .react-grid-item.dh-widget-selected > .react-resizable-handle {
@@ -295,7 +295,7 @@
 }
 
 .dh-panel {
-  background: var(--dh-gray-ui);
+  background: var(--dh-white);
   border-color: var(--dh-border);
 }
 
@@ -305,7 +305,7 @@
 }
 
 .dh-toolbar {
-  background: #fafafa;
+  background: var(--dh-white);
   border-color: var(--dh-border);
 }
 
@@ -317,7 +317,7 @@
 .dh-canvas {
   background: var(--dh-white);
   border-color: var(--dh-border);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+  box-shadow: none;
 }
 
 .dark .dh-canvas {
@@ -327,8 +327,25 @@
 .dh-widget {
   background: var(--dh-white);
   border-color: var(--dh-border);
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow: 0 1px 2px rgb(0 0 0 / 7%);
+}
+
+.dh-props-panel > * {
+  border-bottom: 1px solid var(--dh-gray-200);
+  padding: 12px;
+}
+
+.dh-props-panel [data-slot="label"] {
+  color: var(--dh-gray-500);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.dh-props-panel [data-slot="button"] {
+  border-radius: 4px;
 }
 
 .dark .dh-widget {
@@ -387,4 +404,15 @@
   box-shadow: 0 0 0 1000px var(--card) inset;
   caret-color: var(--foreground);
   transition: background-color 9999s ease-out 0s;
+}
+
+.dh-canvas-grid {
+  background-image: radial-gradient(circle, var(--dh-border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dh-page-tab-active {
+  border-bottom: 2px solid var(--dh-blue);
+  color: var(--dh-black);
+  background: var(--card);
 }
