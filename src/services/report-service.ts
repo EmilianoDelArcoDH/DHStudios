@@ -8,7 +8,7 @@ const enabled = () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.en
 const storageKey = (projectId: string) => `dh-project:${projectId}`;
 const workspaceKey = "dh-projects:index";
 
-export type ProjectTemplate = "blank" | "sales";
+export type ProjectTemplate = "En blanco" | "Comercial";
 export type ProjectSummary = {
   projectId: string;
   name: string;
@@ -131,7 +131,7 @@ function createThumbnail(report: Report) {
 }
 
 function createReportFromTemplate(template: ProjectTemplate, name?: string) {
-  if (template === "sales") {
+  if (template === "Comercial") {
     const report = createDemoReport();
     return { ...report, name: name || report.name, updatedAt: new Date().toISOString() };
   }
@@ -196,7 +196,7 @@ function mapReport(report: DbReport, pages: DbPage[], datasets: DbDataset[], wid
 export const reportService = {
   isEnabled: enabled,
 
-  async createProject(name = "Proyecto sin título", template: ProjectTemplate = "blank") {
+  async createProject(name = "Proyecto sin título", template: ProjectTemplate = "En blanco") {
     const report = createReportFromTemplate(template, name);
     await this.saveReport(report);
     return report;

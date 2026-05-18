@@ -171,6 +171,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
           backgroundSize: "24px 24px",
         }}
         onClick={() => {
+          clearInteractionFilters();
           if (!preview) selectWidget(undefined);
         }}
       >
@@ -292,6 +293,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
                         datasets={report.datasets}
                         dataModel={report.dataModel}
                         globalFilters={globalFilters}
+                        onClearInteractionFilters={clearInteractionFilters}
                       />
                     </div>
                   </section>

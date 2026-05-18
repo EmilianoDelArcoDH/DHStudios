@@ -25,6 +25,7 @@ type Props = {
   datasets?: Dataset[];
   dataModel?: DataModel;
   globalFilters?: WidgetFilter[];
+  onClearInteractionFilters?: () => void;
 };
 
 function activeDimensions(config: ChartConfig) {
@@ -139,7 +140,7 @@ function buildModelChartData(datasets: Dataset[] | undefined, dataModel: DataMod
   );
 }
 
-function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters = [] }: Props) {
+function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters = [], onClearInteractionFilters }: Props) {
   const setInteractionFilter = useEditorStore((state) => state.setInteractionFilter);
   const interactionFilter = useEditorStore((state) => state.interactionFilters[widget.id]);
   const updateWidget = useEditorStore((state) => state.updateWidget);
@@ -172,7 +173,7 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
 
   const handleCategoryClick = (category: string) => {
     const dimension = activeDimensions(widget.config)[0];
-    if (!dimension || !widget.config.enableCrossFilter) return;
+    if (!dimension || widget.config.enableCrossFilter === false) return;
     const current = interactionFilter?.operator === "equals" ? String(interactionFilter.value) : "";
     setInteractionFilter(widget.id, current === category ? undefined : { column: dimension, operator: "equals", value: category });
   };
@@ -248,7 +249,7 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
         onClearInteractionFilter={() => setInteractionFilter(widget.id, undefined)}
       />
       <WidgetChartBoundary>
-        <MeasuredChart option={option} onCategoryClick={handleCategoryClick} />
+        <MeasuredChart option={option} onCategoryClick={handleCategoryClick} onBlankClick={onClearInteractionFilters} />
       </WidgetChartBoundary>
     </div>
   );
@@ -271,10 +272,25 @@ class WidgetChartBoundary extends Component<{ children: ReactNode }, { hasError:
   }
 }
 
-function MeasuredChart({ option, onCategoryClick }: { option: object; onCategoryClick?: (category: string) => void }) {
+type ChartInstance = {
+  resize: () => void;
+  getZr?: () => {
+    on: (eventName: "click", handler: (event: { target?: unknown }) => void) => void;
+    off: (eventName: "click", handler: (event: { target?: unknown }) => void) => void;
+  };
+};
+
+function MeasuredChart({ option, onCategoryClick, onBlankClick }: { option: object; onCategoryClick?: (category: string) => void; onBlankClick?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const chartResizeObserverRef = useRef<ResizeObserver | null>(null);
+  const blankClickRef = useRef(onBlankClick);
+  const blankClickHandlerRef = useRef<((event: { target?: unknown }) => void) | null>(null);
+  const zrRef = useRef<ReturnType<NonNullable<ChartInstance["getZr"]>> | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    blankClickRef.current = onBlankClick;
+  }, [onBlankClick]);
 
   useEffect(() => {
     const element = ref.current;
@@ -297,9 +313,14 @@ function MeasuredChart({ option, onCategoryClick }: { option: object; onCategory
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => () => chartResizeObserverRef.current?.disconnect(), []);
+  useEffect(() => () => {
+    chartResizeObserverRef.current?.disconnect();
+    if (zrRef.current && blankClickHandlerRef.current) {
+      zrRef.current.off("click", blankClickHandlerRef.current);
+    }
+  }, []);
 
-  const handleChartReady = useCallback((chart: { resize: () => void }) => {
+  const handleChartReady = useCallback((chart: ChartInstance) => {
     chartResizeObserverRef.current?.disconnect();
     const element = ref.current;
     if (!element) return;
@@ -308,6 +329,18 @@ function MeasuredChart({ option, onCategoryClick }: { option: object; onCategory
     observer.observe(element);
     chartResizeObserverRef.current = observer;
     chart.resize();
+
+    const zr = chart.getZr?.();
+    if (!zr) return;
+    if (zrRef.current && blankClickHandlerRef.current) {
+      zrRef.current.off("click", blankClickHandlerRef.current);
+    }
+    const blankClickHandler = (event: { target?: unknown }) => {
+      if (!event.target) blankClickRef.current?.();
+    };
+    blankClickHandlerRef.current = blankClickHandler;
+    zrRef.current = zr;
+    zr.on("click", blankClickHandler);
   }, []);
 
   const ready = size.width > 8 && size.height > 8;
@@ -415,14 +448,15 @@ function ChartQuickActions({
         <Button
           variant="outline"
           size="sm"
-          className="h-7 max-w-44 bg-card/95 px-2 text-xs shadow-sm"
-          title={`Filtro activo: ${String(interactionFilter.value)}`}
+          className="h-7 max-w-44 bg-card/95 px-2 text-xs font-medium shadow-sm"
+          title={`Limpiar filtro: ${String(interactionFilter.value)}`}
+          aria-label={`Limpiar filtro: ${String(interactionFilter.value)}`}
           onClick={(event) => {
             event.stopPropagation();
             onClearInteractionFilter();
           }}
         >
-          <span className="truncate">Ver total</span>
+          <span className="truncate">Ver todo</span>
         </Button>
       ) : null}
       {metricOptions.length ? (

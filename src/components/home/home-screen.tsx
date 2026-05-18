@@ -21,8 +21,8 @@ type ThumbnailData = {
 };
 
 const templateOptions: TemplateOption[] = [
-  { value: "blank", label: "En blanco", description: "Canvas limpio para empezar desde cero." },
-  { value: "sales", label: "Comercial", description: "Tablero demo con KPIs, barras, línea y tabla." },
+  { value: "En blanco", label: "En blanco", description: "Canvas limpio para empezar desde cero." },
+  { value: "Comercial", label: "Comercial", description: "Tablero demo con KPIs, barras, línea y tabla." },
 ];
 
 export function HomeScreen() {
@@ -30,7 +30,7 @@ export function HomeScreen() {
   const [projects] = useState<ProjectSummary[]>(() => reportService.getRecentProjects());
   const [projectId, setProjectId] = useState("");
   const [projectName, setProjectName] = useState("Nuevo tablero");
-  const [template, setTemplate] = useState<ProjectTemplate>("sales");
+  const [template, setTemplate] = useState<ProjectTemplate>("En blanco");
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("updated");
   const [loading, setLoading] = useState<"create" | "open" | "duplicate" | null>(null);
