@@ -5,6 +5,10 @@ export const columnTypeSchema = z.enum(["text", "number", "date", "boolean"]);
 export const columnFormatSchema = z.enum(["text", "number", "currency", "percent", "date"]);
 export const aggregationTypeSchema = z.enum(["none", "sum", "avg", "min", "max", "count", "countDistinct"]);
 export const aggregationSchema = z.enum(["sum", "avg", "count", "countDistinct", "min", "max"]);
+export const legendPositionSchema = z.enum(["top", "bottom", "left", "right"]);
+export const valueFormatSchema = z.enum(["number", "currency", "percentage"]);
+export const chartOrientationSchema = z.enum(["vertical", "horizontal"]);
+export const chartStylePresetSchema = z.enum(["modern", "minimal", "corporate", "vibrant"]);
 export const widgetTypeSchema = z.enum([
   "bar",
   "horizontal_bar",
@@ -85,6 +89,16 @@ export const widgetConfigSchema: z.ZodType<ChartConfig> = z.object({
   orderBy: z.string().optional(),
   orderDirection: z.enum(["asc", "desc"]).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
+  colorPalette: z.array(z.string()).optional(),
+  showLegend: z.boolean().optional(),
+  legendPosition: legendPositionSchema.optional(),
+  showGrid: z.boolean().optional(),
+  smooth: z.boolean().optional(),
+  stack: z.boolean().optional(),
+  labelShow: z.boolean().optional(),
+  valueFormat: valueFormatSchema.optional(),
+  orientation: chartOrientationSchema.optional(),
+  stylePreset: chartStylePresetSchema.optional(),
 });
 
 export const widgetStyleSchema: z.ZodType<WidgetStyle> = z.object({

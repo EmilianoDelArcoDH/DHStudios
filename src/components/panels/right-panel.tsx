@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useEditorStore } from "@/store/editor-store";
-import type { Aggregation, ColumnType, Dataset, WidgetFilter, WidgetMetric, WidgetStyle, WidgetType } from "@/types";
+import type { Aggregation, ColumnType, Dataset, ReportWidget, WidgetFilter, WidgetMetric, WidgetStyle, WidgetType } from "@/types";
 import { aggregationOrFallback, getDatasetColumnConfig, getVisibleDatasetColumns } from "@/lib/dataset";
 import { cn } from "@/lib/utils";
 import type { DataModel, DatasetRelationship } from "@/lib/data-model/types";
@@ -17,25 +17,56 @@ import type { DataModel, DatasetRelationship } from "@/lib/data-model/types";
 const aggregations: Aggregation[] = ["sum", "avg", "count", "countDistinct", "min", "max"];
 const EMPTY_SELECT_VALUE = "__none__";
 const defaultSeriesColors = ["#3333ff", "#00cc7e", "#ffc51a", "#ff7059", "#8a6df1", "#ff76e2"];
+const aggregationLabels: Record<Aggregation, string> = {
+  sum: "Suma",
+  avg: "Promedio",
+  count: "Conteo",
+  countDistinct: "Conteo único",
+  min: "Mínimo",
+  max: "Máximo",
+};
+const columnTypeLabels: Record<ColumnType, string> = {
+  text: "Texto",
+  number: "Número",
+  date: "Fecha",
+  boolean: "Booleano",
+};
+const legendPositionLabels: Record<NonNullable<ReportWidget["config"]["legendPosition"]>, string> = {
+  top: "Arriba",
+  bottom: "Abajo",
+  left: "Izquierda",
+  right: "Derecha",
+};
+const valueFormatLabels: Record<NonNullable<ReportWidget["config"]["valueFormat"]>, string> = {
+  number: "Número",
+  currency: "Moneda",
+  percentage: "Porcentaje",
+};
+const stylePresetLabels: Record<NonNullable<ReportWidget["config"]["stylePreset"]>, string> = {
+  modern: "Moderno",
+  minimal: "Minimalista",
+  corporate: "Corporativo",
+  vibrant: "Vibrante",
+};
 
 const cartesianChartTypes: ChartTypeOption[] = [
   { value: "bar", label: "Barra vertical" },
   { value: "horizontal_bar", label: "Barra horizontal" },
   { value: "stacked_bar", label: "Barra apilada" },
-  { value: "line", label: "Linea" },
-  { value: "multi_line", label: "Multiples lineas" },
-  { value: "area", label: "Area" },
-  { value: "combo", label: "Combo barra/linea" },
+  { value: "line", label: "Línea" },
+  { value: "multi_line", label: "Múltiples líneas" },
+  { value: "area", label: "Área" },
+  { value: "combo", label: "Combo barra/línea" },
 ];
 const pieChartTypes: ChartTypeOption[] = [
   { value: "pie", label: "Torta" },
   { value: "donut", label: "Dona" },
 ];
-const scatterChartTypes: ChartTypeOption[] = [{ value: "scatter", label: "Dispersion" }];
-const tableChartTypes: ChartTypeOption[] = [{ value: "table", label: "Tabla" }, { value: "pivot_table", label: "Tabla dinamica" }];
+const scatterChartTypes: ChartTypeOption[] = [{ value: "scatter", label: "Dispersión" }];
+const tableChartTypes: ChartTypeOption[] = [{ value: "table", label: "Tabla" }, { value: "pivot_table", label: "Tabla dinámica" }];
 const scoreChartTypes: ChartTypeOption[] = [
   { value: "kpi", label: "KPI" },
-  { value: "scorecard", label: "Scorecard" },
+  { value: "scorecard", label: "Tarjeta" },
 ];
 
 const cartesianTypes = new Set(cartesianChartTypes.map((item) => item.value));
@@ -88,7 +119,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
           />
           {page ? (
             <FilterControls
-              title="Filtros de pagina"
+              title="Filtros de página"
               filters={page.filters ?? []}
               columns={report.datasets[0] ? getVisibleDatasetColumns(report.datasets[0]) : []}
               onChange={(filters) => updatePage(page.id, { filters })}
@@ -160,7 +191,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
         <TabsContent value="datos" className="dh-props-panel h-0 min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-contain pb-4">
           {typeOptions.length > 1 ? (
-            <Field label="Tipo de grafico">
+            <Field label="Tipo de gráfico">
               <Select value={widget.type} onValueChange={(value) => updateWidget(widget.id, { type: value as WidgetType })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{typeOptions.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
@@ -170,16 +201,16 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           {isText ? (
             <>
-              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
-              <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
+              <div className="flex items-center justify-between"><Label>Mostrar título</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
+              <Field label="Título"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
               <Field label="Texto"><Input value={widget.style.text ?? ""} onChange={(event) => setStyle({ text: event.target.value })} /></Field>
             </>
           ) : null}
 
           {isImage ? (
             <>
-              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? false} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
-              <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
+              <div className="flex items-center justify-between"><Label>Mostrar título</Label><Switch checked={widget.style.showTitle ?? false} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
+              <Field label="Título"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
               <Field label="URL de imagen"><Input value={widget.style.imageUrl ?? ""} onChange={(event) => setStyle({ imageUrl: event.target.value })} /></Field>
             </>
           ) : null}
@@ -200,31 +231,31 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           {isControl ? (
             <>
-              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
+              <div className="flex items-center justify-between"><Label>Mostrar título</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
               <SingleColumnSelect label="Campo de filtro" value={widget.config.dimension} columns={controlColumns} onChange={setSingleDimension} />
-              <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
+              <Field label="Título"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
             </>
           ) : null}
 
           {isScore ? (
             <>
-              <SingleColumnSelect label="Metrica" value={widget.config.metric} columns={metricColumns} onChange={setSingleMetric} />
+              <SingleColumnSelect label="Métrica" value={widget.config.metric} columns={metricColumns} onChange={setSingleMetric} />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
             </>
           ) : null}
 
           {isScatter ? (
             <>
-              <SingleColumnSelect label="Metrica eje X" value={selectedMetrics[0]} columns={metricColumns} onChange={(metric) => setScatterMetric(0, metric)} />
-              <SingleColumnSelect label="Metrica eje Y" value={selectedMetrics[1]} columns={metricColumns} onChange={(metric) => setScatterMetric(1, metric)} />
+              <SingleColumnSelect label="Métrica eje X" value={selectedMetrics[0]} columns={metricColumns} onChange={(metric) => setScatterMetric(0, metric)} />
+              <SingleColumnSelect label="Métrica eje Y" value={selectedMetrics[1]} columns={metricColumns} onChange={(metric) => setScatterMetric(1, metric)} />
               <LimitField value={widget.config.limit} onChange={(limit) => setConfig({ limit })} />
             </>
           ) : null}
 
           {isPie ? (
             <>
-              <SingleColumnSelect label="Dimension" value={widget.config.dimension} columns={dimensionColumns} onChange={setSingleDimension} />
-              <SingleColumnSelect label="Metrica" value={widget.config.metric} columns={metricColumns} onChange={setSingleMetric} />
+              <SingleColumnSelect label="Dimensión" value={widget.config.dimension} columns={dimensionColumns} onChange={setSingleDimension} />
+              <SingleColumnSelect label="Métrica" value={widget.config.metric} columns={metricColumns} onChange={setSingleMetric} />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
             </>
           ) : null}
@@ -235,14 +266,14 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
                 label="Dimensiones"
                 values={widget.config.dimensions ?? (widget.config.dimension ? [widget.config.dimension] : [])}
                 columns={dimensionColumns}
-                addLabel="Agregar dimension"
+                addLabel="Agregar dimensión"
                 onChange={(dimensions) => setConfig({ dimensions, dimension: dimensions[0] })}
               />
               <ColumnList
-                label="Metricas"
+                label="Métricas"
                 values={selectedMetrics}
                 columns={metricColumns}
-                addLabel="Agregar metrica"
+                addLabel="Agregar métrica"
                 onChange={(metrics) => setConfig({ metrics, metric: metrics[0], aggregation: suggestedAggregation(metrics[0]) })}
               />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
@@ -264,17 +295,17 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
                 <Switch checked={widget.config.enableCrossFilter ?? true} onCheckedChange={(enableCrossFilter) => setConfig({ enableCrossFilter })} />
               </div>
               <ColumnList
-                label="Drill down"
+                label="Desglose"
                 values={widget.config.drillDimensions ?? []}
                 columns={dimensionColumns}
                 addLabel="Agregar nivel"
                 onChange={(drillDimensions) => setConfig({ drillDimensions, drillLevel: 0, dimension: drillDimensions[0] ?? widget.config.dimension, dimensions: drillDimensions[0] ? [drillDimensions[0]] : widget.config.dimensions })}
               />
               <ColumnList
-                label="Metricas opcionales"
+                label="Métricas opcionales"
                 values={(widget.config.optionalMetrics ?? []).map(metricKey)}
                 columns={metricColumns}
-                addLabel="Agregar metrica opcional"
+                addLabel="Agregar métrica opcional"
                 onChange={(optionalMetrics) => setConfig({ optionalMetrics, activeOptionalMetric: optionalMetrics[0] })}
               />
             </>
@@ -309,10 +340,10 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
                 onChange={(column) => setConfig({ dimensions: [widget.config.dimensions?.[0], column].filter(Boolean) as string[] })}
               />
               <ColumnList
-                label="Metricas"
+                label="Métricas"
                 values={selectedMetrics}
                 columns={metricColumns}
-                addLabel="Agregar metrica"
+                addLabel="Agregar métrica"
                 onChange={(metrics) => setConfig({ metrics, metric: metrics[0], aggregation: suggestedAggregation(metrics[0]) })}
               />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
@@ -326,8 +357,8 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
         <TabsContent value="estilo" className="dh-props-panel h-0 min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-contain pb-4">
           {!isText && !isImage ? (
             <>
-              <div className="flex items-center justify-between"><Label>Mostrar titulo</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
-              <Field label="Titulo"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
+              <div className="flex items-center justify-between"><Label>Mostrar título</Label><Switch checked={widget.style.showTitle ?? true} onCheckedChange={(showTitle) => setStyle({ showTitle })} /></div>
+              <Field label="Título"><Input value={widget.style.title ?? ""} onChange={(event) => setStyle({ title: event.target.value })} /></Field>
             </>
           ) : null}
 
@@ -335,8 +366,9 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           {isPie ? (
             <>
-              <div className="flex items-center justify-between"><Label>Leyenda</Label><Switch checked={widget.style.showLegend ?? true} onCheckedChange={(showLegend) => setStyle({ showLegend })} /></div>
+              <div className="flex items-center justify-between"><Label>Leyenda</Label><Switch checked={widget.config.showLegend ?? widget.style.showLegend ?? true} onCheckedChange={(showLegend) => setConfig({ showLegend })} /></div>
               <div className="flex items-center justify-between"><Label>% en torta/dona</Label><Switch checked={widget.style.showPiePercent ?? false} onCheckedChange={(showPiePercent) => setStyle({ showPiePercent })} /></div>
+              <ChartAppearanceOptions widget={widget} setConfig={setConfig} compact />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Radio interno"><Input type="number" min={0} max={80} value={widget.style.pieInnerRadius ?? 0} onChange={(event) => setStyle({ pieInnerRadius: Number(event.target.value) })} /></Field>
                 <Field label="Radio externo"><Input type="number" min={10} max={90} value={widget.style.pieOuterRadius ?? 58} onChange={(event) => setStyle({ pieOuterRadius: Number(event.target.value) })} /></Field>
@@ -346,11 +378,12 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           {isCartesian ? (
             <>
-              <div className="flex items-center justify-between"><Label>Leyenda</Label><Switch checked={widget.style.showLegend ?? true} onCheckedChange={(showLegend) => setStyle({ showLegend })} /></div>
-              <div className="flex items-center justify-between"><Label>Etiquetas</Label><Switch checked={widget.style.showDataLabels ?? false} onCheckedChange={(showDataLabels) => setStyle({ showDataLabels })} /></div>
-              <div className="flex items-center justify-between"><Label>Apilar series</Label><Switch checked={widget.style.stackSeries ?? false} onCheckedChange={(stackSeries) => setStyle({ stackSeries })} /></div>
+              <div className="flex items-center justify-between"><Label>Leyenda</Label><Switch checked={widget.config.showLegend ?? widget.style.showLegend ?? true} onCheckedChange={(showLegend) => setConfig({ showLegend })} /></div>
+              <div className="flex items-center justify-between"><Label>Etiquetas</Label><Switch checked={widget.config.labelShow ?? widget.style.showDataLabels ?? false} onCheckedChange={(labelShow) => setConfig({ labelShow })} /></div>
+              <div className="flex items-center justify-between"><Label>Apilar series</Label><Switch checked={widget.config.stack ?? widget.style.stackSeries ?? false} onCheckedChange={(stack) => setConfig({ stack })} /></div>
+              <ChartAppearanceOptions widget={widget} setConfig={setConfig} />
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Grosor linea"><Input type="number" min={1} max={8} value={widget.style.lineWidth ?? 2} onChange={(event) => setStyle({ lineWidth: Number(event.target.value) })} /></Field>
+                <Field label="Grosor de línea"><Input type="number" min={1} max={8} value={widget.style.lineWidth ?? 2} onChange={(event) => setStyle({ lineWidth: Number(event.target.value) })} /></Field>
                 <Field label="Radio barra"><Input type="number" min={0} max={12} value={widget.style.barRadius ?? 3} onChange={(event) => setStyle({ barRadius: Number(event.target.value) })} /></Field>
               </div>
             </>
@@ -368,6 +401,57 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
+}
+
+function ChartAppearanceOptions({
+  widget,
+  setConfig,
+  compact = false,
+}: {
+  widget: ReportWidget;
+  setConfig: (patch: Partial<ReportWidget["config"]>) => void;
+  compact?: boolean;
+}) {
+  const legendPosition = widget.config.legendPosition ?? "bottom";
+  const valueFormat = widget.config.valueFormat ?? "number";
+  const stylePreset = widget.config.stylePreset ?? "modern";
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Leyenda">
+          <Select value={legendPosition} onValueChange={(nextLegendPosition) => setConfig({ legendPosition: nextLegendPosition as ReportWidget["config"]["legendPosition"] })}>
+            <SelectTrigger><span>{legendPositionLabels[legendPosition]}</span></SelectTrigger>
+            <SelectContent>
+              {Object.entries(legendPositionLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Formato">
+          <Select value={valueFormat} onValueChange={(nextValueFormat) => setConfig({ valueFormat: nextValueFormat as ReportWidget["config"]["valueFormat"] })}>
+            <SelectTrigger><span>{valueFormatLabels[valueFormat]}</span></SelectTrigger>
+            <SelectContent>
+              {Object.entries(valueFormatLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+      <Field label="Preset">
+        <Select value={stylePreset} onValueChange={(nextStylePreset) => setConfig({ stylePreset: nextStylePreset as ReportWidget["config"]["stylePreset"] })}>
+          <SelectTrigger><span>{stylePresetLabels[stylePreset]}</span></SelectTrigger>
+          <SelectContent>
+            {Object.entries(stylePresetLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </Field>
+      {!compact ? (
+        <>
+          <div className="flex items-center justify-between"><Label>Grid suave</Label><Switch checked={widget.config.showGrid ?? true} onCheckedChange={(showGrid) => setConfig({ showGrid })} /></div>
+          <div className="flex items-center justify-between"><Label>Línea suavizada</Label><Switch checked={widget.config.smooth ?? true} onCheckedChange={(smooth) => setConfig({ smooth })} /></div>
+        </>
+      ) : null}
+    </>
+  );
 }
 
 function FilterControls({
@@ -525,11 +609,11 @@ function DataModelControls({
         <h3 className="text-sm font-semibold">Modelo de datos</h3>
         <Button variant="ghost" size="sm" className="mt-1 h-7 justify-start border border-dashed border-border px-2 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary" onClick={addRelationship} disabled={reportDatasets.length < 2}>
           <Plus className="mr-1.5 h-3 w-3" />
-          Relacion
+          Relación
         </Button>
       </div>
       {dataModel.relationships.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Agrega relaciones como ventas.id_producto - productos.id_producto para usar dimensiones relacionadas.</p>
+        <p className="text-xs text-muted-foreground">Agregá relaciones como ventas.id_producto - productos.id_producto para usar dimensiones relacionadas.</p>
       ) : null}
       {dataModel.relationships.map((relationship) => {
         const fromDataset = reportDatasets.find((dataset) => dataset.id === relationship.fromDatasetId) ?? reportDatasets[0];
@@ -540,7 +624,7 @@ function DataModelControls({
           <div key={relationship.id} className="space-y-3 rounded-md border border-[var(--dh-border)] bg-card p-3">
             <div className="space-y-3">
               <div className="space-y-2">
-                <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">Datasets</p>
+                <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">Fuentes</p>
                 <DatasetSelect label="Tabla base" datasets={reportDatasets} value={relationship.fromDatasetId} onChange={(fromDatasetId) => {
                   const nextDataset = reportDatasets.find((dataset) => dataset.id === fromDatasetId);
                   const nextColumns = pickRelationshipColumns(nextDataset, toDataset);
@@ -558,7 +642,7 @@ function DataModelControls({
               </div>
 
               <div className="space-y-2 border-t border-[var(--dh-border)] pt-3">
-                <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">Campos de union</p>
+                <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">Campos de unión</p>
                 <SingleColumnSelect label="ID en base" value={relationship.fromColumn} columns={fromDataset ? getDatasetColumnConfig(fromDataset) : []} onChange={(fromColumn) => updateRelationship(relationship.id, { fromColumn: fromColumn ?? "" })} />
                 <SingleColumnSelect label="ID relacionado" value={relationship.toColumn} columns={toDataset ? getDatasetColumnConfig(toDataset) : []} onChange={(toColumn) => updateRelationship(relationship.id, { toColumn: toColumn ?? "" })} />
               </div>
@@ -578,7 +662,7 @@ function DataModelControls({
               </div>
             ) : null}
             <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => removeRelationship(relationship.id)}>
-              Eliminar relacion
+              Eliminar relación
             </Button>
           </div>
         );
@@ -596,7 +680,7 @@ function DatasetSelect({ label, datasets, value, onChange }: { label: string; da
         if (next) onChange(next);
       }}>
         <SelectTrigger className="w-full min-w-0">
-          <span className="truncate text-left">{selectedDataset?.name ?? "Dataset"}</span>
+          <span className="truncate text-left">{selectedDataset?.name ?? "Fuente"}</span>
         </SelectTrigger>
         <SelectContent className="min-w-56">{datasets.map((dataset) => <SelectItem key={dataset.id} value={dataset.id}>{dataset.name}</SelectItem>)}</SelectContent>
       </Select>
@@ -634,8 +718,8 @@ function SingleColumnSelect({
             <span className="truncate text-left">{selectedColumn ? addLabelForField(label) : "Seleccionar"}</span>
           </SelectTrigger>
           <SelectContent className="min-w-56">
-            <SelectItem value={EMPTY_SELECT_VALUE}>Sin seleccion</SelectItem>
-            {columns.map((column) => <SelectItem key={column.name} value={column.name}>{columnDisplayName(column)} - {column.type}</SelectItem>)}
+            <SelectItem value={EMPTY_SELECT_VALUE}>Sin selección</SelectItem>
+            {columns.map((column) => <SelectItem key={column.name} value={column.name}>{columnDisplayName(column)} - {columnTypeLabel(column.type)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -644,13 +728,14 @@ function SingleColumnSelect({
 }
 
 function fieldChipVariant(label: string): "metric" | "dimension" {
-  return normalizeColumnName(label).includes("metrica") ? "metric" : "dimension";
+  const normalized = normalizeColumnName(label);
+  return normalized.includes("metrica") || normalized.includes("métrica") ? "metric" : "dimension";
 }
 
 function addLabelForField(label: string) {
   const normalized = normalizeColumnName(label);
-  if (normalized.includes("metrica")) return "Agregar métrica";
-  if (normalized.includes("dimension")) return "Agregar dimensión";
+  if (normalized.includes("metrica") || normalized.includes("métrica")) return "Agregar métrica";
+  if (normalized.includes("dimension") || normalized.includes("dimensión")) return "Agregar dimensión";
   if (normalized.includes("filtro")) return "Agregar campo";
   return `Agregar ${label.toLowerCase()}`;
 }
@@ -687,8 +772,8 @@ function ColumnAddSelect({
         <span className="truncate text-left">{addLabel}</span>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={EMPTY_SELECT_VALUE}>Sin seleccion</SelectItem>
-        {columns.map((column) => <SelectItem key={column.name} value={column.name}>{column.label ?? column.name} - {column.type}</SelectItem>)}
+        <SelectItem value={EMPTY_SELECT_VALUE}>Sin selección</SelectItem>
+        {columns.map((column) => <SelectItem key={column.name} value={column.name}>{column.label ?? column.name} - {columnTypeLabel(column.type)}</SelectItem>)}
       </SelectContent>
     </Select>
   );
@@ -696,6 +781,10 @@ function ColumnAddSelect({
 
 function columnDisplayName(column?: ColumnOption) {
   return column ? column.label ?? column.name : "Seleccionar";
+}
+
+function columnTypeLabel(type: ColumnType) {
+  return columnTypeLabels[type] ?? type;
 }
 
 function pickRelationshipColumns(fromDataset?: Dataset, toDataset?: Dataset) {
@@ -740,7 +829,7 @@ function suggestBaseColumn(fromDataset: Dataset, toDataset: Dataset, toColumn: s
   });
 
   if (!bestColumn || bestMatches === 0) return undefined;
-  return `Proba usar ${fromDataset.name}.${bestColumn} como ID en base.`;
+  return `Probá usar ${fromDataset.name}.${bestColumn} como ID en base.`;
 }
 
 function normalizeColumnName(value: string) {
@@ -755,10 +844,10 @@ function normalizeJoinKey(value: unknown) {
 
 function AggregationField({ value, onChange }: { value: Aggregation; onChange: (value: Aggregation) => void }) {
   return (
-    <Field label="Agregacion">
+    <Field label="Agregación">
       <Select value={value} onValueChange={(next) => onChange(next as Aggregation)}>
         <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>{aggregations.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+        <SelectContent>{aggregations.map((item) => <SelectItem key={item} value={item}>{aggregationLabels[item]}</SelectItem>)}</SelectContent>
       </Select>
     </Field>
   );
@@ -766,7 +855,7 @@ function AggregationField({ value, onChange }: { value: Aggregation; onChange: (
 
 function LimitField({ value, onChange }: { value?: number; onChange: (value: number) => void }) {
   return (
-    <Field label="Limite de filas">
+    <Field label="Límite de filas">
       <Input type="number" value={value ?? 20} onChange={(event) => onChange(Number(event.target.value))} />
     </Field>
   );

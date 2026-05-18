@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { ChartConfig, ColumnFormat, Dataset, DatasetColumnConfig, DatasetRow, ReportWidget, WidgetFilter, WidgetMetric } from "@/types";
 import { aggregate, applyCalculatedFields, applyFilters, getDatasetColumnConfig, getVisibleDatasetColumns } from "@/lib/dataset";
@@ -12,10 +12,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useChartOptions } from "./use-chart-options";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), {
   ssr: false,
-  loading: () => <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Cargando gráfico...</div>,
+  loading: () => <ChartLoadingState label="Cargando gráfico..." />,
 });
 
 type Props = {
@@ -24,21 +25,6 @@ type Props = {
   datasets?: Dataset[];
   dataModel?: DataModel;
   globalFilters?: WidgetFilter[];
-};
-
-const defaultColors = ["#3333ff", "#00cc7e", "#ffc51a", "#ff7059", "#8a6df1", "#ff76e2"];
-const bottomLegend = {
-  bottom: 8,
-  type: "scroll",
-  itemGap: 14,
-  itemWidth: 12,
-  itemHeight: 8,
-  textStyle: { fontSize: 11 },
-};
-const pieLegend = {
-  ...bottomLegend,
-  bottom: 6,
-  padding: [18, 0, 0, 0],
 };
 
 function activeDimensions(config: ChartConfig) {
@@ -121,12 +107,12 @@ function buildChartData(dataset: Dataset | undefined, config: ChartConfig) {
 }
 
 function validateWidget(dataset: Dataset | undefined, config: ChartConfig) {
-  if (!dataset) return "Selecciona una fuente de datos.";
+  if (!dataset) return "Seleccioná una fuente de datos.";
   const columns = new Set(getDatasetColumnConfig(dataset).map((column) => column.name));
   const missingDimension = activeDimensions(config).find((dimension) => !columns.has(dimension));
   const missingMetric = activeMetrics(config).find((metric) => metric && !columns.has(metric));
-  if (missingDimension) return `La dimension no es valida: ${readableColumnName(missingDimension)}.`;
-  if (missingMetric) return `La metrica no es valida: ${readableColumnName(missingMetric)}.`;
+  if (missingDimension) return `La dimensión no es válida: ${readableColumnName(missingDimension)}.`;
+  if (missingMetric) return `La métrica no es válida: ${readableColumnName(missingMetric)}.`;
   return "";
 }
 
@@ -162,110 +148,7 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
     () => buildModelChartData(datasets, dataModel, effectiveConfig) ?? buildChartData(dataset, effectiveConfig),
     [dataModel, dataset, datasets, effectiveConfig],
   );
-  const option = useMemo(
-    () => {
-      const colors = widget.style.seriesColors?.length ? widget.style.seriesColors : defaultColors;
-      const firstMetric = chartData.series[0];
-      const showLegend = widget.style.showLegend ?? true;
-      const showPiePercent = widget.style.showPiePercent ?? false;
-      const requestedPieOuterRadius = widget.style.pieOuterRadius ?? 58;
-      const pieOuterRadius = showLegend ? Math.min(Math.max(requestedPieOuterRadius, 66), 72) : requestedPieOuterRadius;
-      const pieRadius = widget.type === "donut"
-        ? [`${widget.style.pieInnerRadius ?? 45}%`, `${pieOuterRadius}%`]
-        : [`${widget.style.pieInnerRadius ?? 0}%`, `${pieOuterRadius}%`];
-
-      if (widget.type === "pie" || widget.type === "donut") {
-        const pieData = chartData.categories.map((name, index) => ({ name, value: firstMetric?.data[index] ?? 0 }));
-        const total = pieData.reduce((sum, item) => sum + Number(item.value ?? 0), 0);
-        const percentByName = new Map(
-          pieData.map((item) => [
-            item.name,
-            total > 0 ? `${((Number(item.value) / total) * 100).toFixed(1).replace(".0", "")}%` : "0%",
-          ]),
-        );
-
-        return {
-          color: colors,
-          tooltip: { trigger: "item", formatter: "{b}: {c} ({d}%)" },
-          legend: {
-            ...pieLegend,
-            show: showLegend,
-            formatter: showPiePercent ? (name: string) => `${name} ${percentByName.get(name) ?? ""}` : undefined,
-          },
-          series: [{
-            type: "pie",
-            radius: pieRadius,
-            center: ["50%", showLegend ? "40%" : "50%"],
-            top: 0,
-            bottom: showLegend ? 58 : 0,
-            avoidLabelOverlap: true,
-            label: {
-              show: widget.style.showDataLabels,
-              formatter: showPiePercent ? "{b}: {d}%" : "{b}",
-              fontSize: 11,
-            },
-            labelLine: { show: widget.style.showDataLabels, length: 8, length2: 8 },
-            data: pieData,
-          }],
-        };
-      }
-
-      if (widget.type === "scatter") {
-        const [xMetric, yMetric] = chartData.metrics;
-        const rows = chartData.rows.slice(0, widget.config.limit ?? 50);
-        return {
-          color: colors,
-          tooltip: { trigger: "item" },
-          legend: { ...bottomLegend, show: widget.style.showLegend },
-          grid: { top: 28, right: 16, bottom: widget.style.showLegend ? 72 : 36, left: 44, containLabel: true },
-          xAxis: { type: "value", name: xMetric },
-          yAxis: { type: "value", name: yMetric },
-          series: [{
-            name: `${xMetric ?? "x"} / ${yMetric ?? "y"}`,
-            type: "scatter",
-            symbolSize: 9,
-            data: rows.map((row) => [Number(row[xMetric] ?? 0), Number(row[yMetric] ?? 0)]),
-          }],
-        };
-      }
-
-      const isHorizontal = widget.type === "horizontal_bar";
-      const isStacked = widget.type === "stacked_bar" || widget.style.stackSeries;
-      const isLineLike = widget.type === "line" || widget.type === "multi_line" || widget.type === "area";
-      const series = chartData.series.map((item, index) => {
-        const comboLine = widget.type === "combo" && index > 0;
-        const type = comboLine || isLineLike ? "line" : "bar";
-        return {
-          name: item.name,
-          type,
-          stack: isStacked ? "total" : undefined,
-          smooth: type === "line",
-          yAxisIndex: widget.type === "combo" && comboLine ? 1 : 0,
-          areaStyle: widget.type === "area" ? {} : undefined,
-          lineStyle: type === "line" ? { width: widget.style.lineWidth ?? 2 } : undefined,
-          itemStyle: {
-            color: colors[index % colors.length],
-            borderRadius: type === "bar" ? widget.style.barRadius ?? 3 : undefined,
-          },
-          label: { show: widget.style.showDataLabels },
-          data: item.data,
-        };
-      });
-
-      return {
-        color: colors,
-        tooltip: { trigger: "axis" },
-        legend: { ...bottomLegend, show: widget.style.showLegend },
-        grid: { top: 28, right: 16, bottom: widget.style.showLegend ? 76 : 38, left: 44, containLabel: true },
-        xAxis: isHorizontal ? { type: "value" } : { type: "category", data: chartData.categories },
-        yAxis: widget.type === "combo"
-          ? [{ type: "value" }, { type: "value" }]
-          : isHorizontal ? { type: "category", data: chartData.categories } : { type: "value" },
-        series,
-      };
-    },
-    [chartData, widget.config.limit, widget.style, widget.type],
-  );
+  const option = useChartOptions({ widget, chartData });
 
   if (widget.type === "text") {
     return <div className="whitespace-pre-wrap p-3 text-sm" style={{ color: widget.style.color }}>{widget.style.text}</div>;
@@ -364,13 +247,33 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
         onResetDrill={resetDrill}
         onClearInteractionFilter={() => setInteractionFilter(widget.id, undefined)}
       />
-      <MeasuredChart option={option} onCategoryClick={handleCategoryClick} />
+      <WidgetChartBoundary>
+        <MeasuredChart option={option} onCategoryClick={handleCategoryClick} />
+      </WidgetChartBoundary>
     </div>
   );
 }
 
+class WidgetChartBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("Chart widget render failed", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) return <InvalidWidget label="No se pudo renderizar este gráfico." />;
+    return this.props.children;
+  }
+}
+
 function MeasuredChart({ option, onCategoryClick }: { option: object; onCategoryClick?: (category: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const chartResizeObserverRef = useRef<ResizeObserver | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -394,21 +297,36 @@ function MeasuredChart({ option, onCategoryClick }: { option: object; onCategory
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => () => chartResizeObserverRef.current?.disconnect(), []);
+
+  const handleChartReady = useCallback((chart: { resize: () => void }) => {
+    chartResizeObserverRef.current?.disconnect();
+    const element = ref.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver(() => chart.resize());
+    observer.observe(element);
+    chartResizeObserverRef.current = observer;
+    chart.resize();
+  }, []);
+
   const ready = size.width > 8 && size.height > 8;
 
   return (
-    <div ref={ref} className="h-full min-h-0 w-full min-w-0">
+    <div ref={ref} className="chart-container h-full min-h-[320px] w-full min-w-0">
       {ready ? (
         <ReactECharts
           option={option}
           onEvents={{ click: (params: { name?: string }) => params.name ? onCategoryClick?.(String(params.name)) : undefined }}
           style={{ height: "100%", width: "100%" }}
+          opts={{ renderer: "svg" }}
+          onChartReady={handleChartReady}
           notMerge
           lazyUpdate
           autoResize
         />
       ) : (
-        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">Preparando gráfico...</div>
+        <ChartLoadingState label="Preparando gráfico..." />
       )}
     </div>
   );
@@ -510,7 +428,7 @@ function ChartQuickActions({
       {metricOptions.length ? (
         <Select value={widget.config.activeOptionalMetric ?? ""} onValueChange={(value) => onMetricChange(value || undefined)}>
           <SelectTrigger className="h-7 w-32 bg-card/95 px-2 text-xs shadow-sm">
-            <SelectValue placeholder="Metrica" />
+            <SelectValue placeholder="Métrica" />
           </SelectTrigger>
           <SelectContent>
             {metricOptions.map((metric) => <SelectItem key={metric.key} value={metric.key}>{metric.label}</SelectItem>)}
@@ -519,8 +437,8 @@ function ChartQuickActions({
       ) : null}
       {drillDimensions.length > 1 ? (
         <>
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onDrillDown}>Drill</Button>
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onResetDrill}>Reset</Button>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onDrillDown}>Desglosar</Button>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onResetDrill}>Reiniciar</Button>
         </>
       ) : null}
       {/* <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={exportCsv}>CSV</Button> */}
@@ -545,7 +463,7 @@ function PivotTable({
   aggregation: WidgetMetric["aggregation"];
   limit: number;
 }) {
-  if (!rowDimension || !columnDimension) return <InvalidWidget label="Configura filas y columnas para la tabla dinamica." />;
+  if (!rowDimension || !columnDimension) return <InvalidWidget label="Configura filas y columnas para la tabla dinámica." />;
   const rowLabels = Array.from(new Set(rows.map((row) => String(row[rowDimension] ?? "Sin valor")))).slice(0, limit);
   const columnLabels = Array.from(new Set(rows.map((row) => String(row[columnDimension] ?? "Sin valor")))).slice(0, 30);
   const metricColumn = metric?.column ?? metric?.id;
@@ -592,8 +510,8 @@ function ControlWidget({ widget, dataset }: { widget: ReportWidget; dataset?: Da
     : "Campo";
   const showTitle = widget.style.showTitle ?? true;
 
-  if (!dataset) return <EmptyWidget label="Selecciona una fuente de datos" />;
-  if (!column) return <EmptyWidget label="Selecciona un campo de filtro" />;
+  if (!dataset) return <EmptyWidget label="Seleccioná una fuente de datos" />;
+  if (!column) return <EmptyWidget label="Seleccioná un campo de filtro" />;
 
   if (widget.type === "control_select") {
     const options = uniqueColumnValues(dataset, column);
@@ -654,14 +572,27 @@ function formatValue(value: unknown, format: ColumnFormat = "text") {
 }
 
 function EmptyWidget({ label }: { label: string }) {
-  return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{label}</div>;
+  return <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">{label}</div>;
+}
+
+function ChartLoadingState({ label }: { label: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-xs text-muted-foreground">
+      <div className="grid h-10 w-10 grid-cols-3 items-end gap-1 rounded-md border border-border bg-card p-2 shadow-sm">
+        <span className="h-3 rounded-sm bg-primary/35" />
+        <span className="h-5 rounded-sm bg-primary/55" />
+        <span className="h-7 rounded-sm bg-primary/75" />
+      </div>
+      <span>{label}</span>
+    </div>
+  );
 }
 
 function InvalidWidget({ label }: { label: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center text-muted-foreground">
       <div className="font-mono text-lg">!</div>
-      <div className="text-sm font-semibold text-foreground">Configuracion no valida</div>
+      <div className="text-sm font-semibold text-foreground">Configuración no válida</div>
       <div className="max-w-xs text-xs">{label}</div>
     </div>
   );

@@ -29,8 +29,8 @@ const chartItems: { type: WidgetType; label: string; icon: React.ElementType }[]
   { type: "combo", label: "Combo", icon: BarChart3 },
   { type: "scatter", label: "Dispersión", icon: ScatterChart },
   { type: "table", label: "Tabla", icon: Table2 },
-  { type: "pivot_table", label: "Tabla dinamica", icon: Table2 },
-  { type: "scorecard", label: "Scorecard", icon: LayoutTemplate },
+  { type: "pivot_table", label: "Tabla dinámica", icon: Table2 },
+  { type: "scorecard", label: "Tarjeta", icon: LayoutTemplate },
 ];
 
 const contentItems: { type: WidgetType; label: string; icon: React.ElementType }[] = [
@@ -112,7 +112,7 @@ export function ToolBar({ onAddData }: { onAddData?: () => void }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Graficos</DropdownMenuLabel>
+            <DropdownMenuLabel>Gráficos</DropdownMenuLabel>
 
             {chartItems.map((item) => {
               const Icon = item.icon;
@@ -133,12 +133,12 @@ export function ToolBar({ onAddData }: { onAddData?: () => void }) {
         </DropdownMenuContent>
       </DropdownMenu>
       <DropdownMenu>
-        <DropdownMenuTrigger aria-label="Mas graficos" className={buttonVariants({ variant: "ghost", size: "icon-sm", className: "h-8 rounded" })}>
+        <DropdownMenuTrigger aria-label="Más gráficos" className={buttonVariants({ variant: "ghost", size: "icon-sm", className: "h-8 rounded" })}>
           <SlidersHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-48">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>Elementos rapidos</DropdownMenuLabel>
+            <DropdownMenuLabel>Elementos rápidos</DropdownMenuLabel>
             {contentItems.filter((item) => item.type === "kpi" || item.type === "text" || item.type === "image").map((item) => {
               const Icon = item.icon;
 
@@ -180,11 +180,11 @@ export function ToolBar({ onAddData }: { onAddData?: () => void }) {
         </DropdownMenuContent>
       </DropdownMenu>
       <Separator orientation="vertical" className="mx-1.5 h-5 bg-border" />
-      <ToolbarIcon label="Codigo / insertar" disabled><Code2 className="h-4 w-4" /></ToolbarIcon>
+      <ToolbarIcon label="Código / insertar" disabled><Code2 className="h-4 w-4" /></ToolbarIcon>
       <ToolbarIcon label="Imagen" onClick={() => addWidget("image")}><ImageIcon className="h-4 w-4" /></ToolbarIcon>
       <ToolbarIcon label="Texto" onClick={() => addWidget("text")}><Type className="h-4 w-4" /></ToolbarIcon>
       <DropdownMenu>
-        <DropdownMenuTrigger aria-label="Mas herramientas" className={buttonVariants({ variant: "ghost", size: "icon-sm", className: "h-8 rounded" })}>
+        <DropdownMenuTrigger aria-label="Más herramientas" className={buttonVariants({ variant: "ghost", size: "icon-sm", className: "h-8 rounded" })}>
           <MoreVertical className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
@@ -192,8 +192,8 @@ export function ToolBar({ onAddData }: { onAddData?: () => void }) {
             <DropdownMenuLabel>Herramientas</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => addWidget("kpi")}>Añadir KPI</DropdownMenuItem>
             <DropdownMenuItem onClick={() => addWidget("table")}>Añadir tabla</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => addWidget("pivot_table")}>Añadir tabla dinamica</DropdownMenuItem>
-            <DropdownMenuItem disabled>Insertar codigo</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => addWidget("pivot_table")}>Añadir tabla dinámica</DropdownMenuItem>
+            <DropdownMenuItem disabled>Insertar código</DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>

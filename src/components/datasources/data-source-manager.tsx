@@ -18,6 +18,21 @@ import { cn } from "@/lib/utils";
 const formats: ColumnFormat[] = ["text", "number", "currency", "percent", "date"];
 const aggregations: AggregationType[] = ["none", "sum", "avg", "min", "max", "count", "countDistinct"];
 const types: ColumnType[] = ["text", "number", "date", "boolean"];
+const optionLabels: Record<string, string> = {
+  text: "Texto",
+  number: "Número",
+  currency: "Moneda",
+  percent: "Porcentaje",
+  date: "Fecha",
+  boolean: "Booleano",
+  none: "Ninguna",
+  sum: "Suma",
+  avg: "Promedio",
+  min: "Mínimo",
+  max: "Máximo",
+  count: "Conteo",
+  countDistinct: "Conteo único",
+};
 
 export function DataSourceManager({ initialDatasetId, onClose }: { initialDatasetId?: string; onClose?: () => void }) {
   const { report, updateDataset } = useEditorStore();
@@ -35,7 +50,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
       (draft.calculatedFields ?? []).map((field) => {
         const validation = validateCalculatedFieldFormula(draft, field.formula);
         const referencesItself = validation.valid && field.name && field.formula.match(new RegExp(`\\b${escapeRegExp(field.name)}\\b`));
-        return [field.id, referencesItself ? "El campo no puede referenciarse a si mismo." : validation.message];
+        return [field.id, referencesItself ? "El campo no puede referenciarse a sí mismo." : validation.message];
       }),
     );
   }, [draft]);
@@ -112,7 +127,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
         <div className="max-w-sm rounded-md border border-[var(--dh-border)] bg-card p-5 text-center shadow-sm">
           <Database className="mx-auto mb-3 h-6 w-6 text-muted-foreground" />
           <h2 className="text-sm font-semibold">No hay fuentes cargadas</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Subi un CSV o agrega datos demo desde el panel izquierdo.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Subí un CSV o agregá datos demo desde el panel izquierdo.</p>
         </div>
       </section>
     );
@@ -123,7 +138,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
       <aside className="flex w-72 shrink-0 flex-col border-r border-[var(--dh-border)] bg-card">
         <div className="border-b border-[var(--dh-border)] p-3">
           <h2 className="text-sm font-semibold">Fuentes de datos</h2>
-          <p className="text-xs text-muted-foreground">Campos, formatos y calculos locales.</p>
+          <p className="text-xs text-muted-foreground">Campos, formatos y cálculos locales.</p>
         </div>
         <div className="min-h-0 flex-1 space-y-2 overflow-auto p-3">
           {report.datasets.map((dataset) => (
@@ -167,7 +182,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
                   </p>
                 </div>
                 {status ? <span className="text-xs text-emerald-700">{status}</span> : null}
-                <Button variant="outline" size="sm" onClick={onClose}>Volver al canvas</Button>
+                <Button variant="outline" size="sm" onClick={onClose}>Volver al lienzo</Button>
                 <Button size="sm" onClick={save} disabled={hasFormulaErrors}>
                   <Save className="mr-2 h-4 w-4" />
                   Guardar cambios
@@ -184,7 +199,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
             <section className="space-y-3 rounded-md border border-[var(--dh-border)] bg-background p-3">
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-semibold">Columnas</h2>
-                <p className="text-xs text-muted-foreground">El formato solo cambia la visualizacion; el dato original queda intacto.</p>
+                <p className="text-xs text-muted-foreground">El formato solo cambia la visualización; el dato original queda intacto.</p>
               </div>
               <div className="overflow-auto rounded-md border border-[var(--dh-border)]">
                 <Table>
@@ -193,7 +208,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
                       <TableHead>Nombre</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Formato visual</TableHead>
-                      <TableHead>Agregacion por defecto</TableHead>
+                      <TableHead>Agregación por defecto</TableHead>
                       <TableHead>Visible</TableHead>
                       <TableHead>Etiqueta visible</TableHead>
                     </TableRow>
@@ -206,7 +221,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
                           <div className="font-mono text-[11px] text-muted-foreground">{column.name}</div>
                           {column.isCalculated ? <Badge variant="secondary" className="mt-1">Calculado</Badge> : null}
                         </TableCell>
-                        <TableCell className="text-xs">{column.type}</TableCell>
+                        <TableCell className="text-xs">{optionLabel(column.type)}</TableCell>
                         <TableCell>
                           <CompactSelect value={column.format} values={formats} onChange={(format) => updateColumnConfig(column.name, { format })} />
                         </TableCell>
@@ -237,7 +252,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h2 className="flex items-center gap-2 text-sm font-semibold"><Calculator className="h-4 w-4" />Campos calculados</h2>
-                  <p className="text-xs text-muted-foreground">Arma formulas con columnas existentes y operadores numericos simples.</p>
+                  <p className="text-xs text-muted-foreground">Armá fórmulas con columnas existentes y operadores numéricos simples.</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={addCalculatedField}>
                   <Plus className="mr-2 h-4 w-4" />
@@ -246,7 +261,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
               </div>
               {(draft.calculatedFields ?? []).length === 0 ? (
                 <div className="rounded-md border border-dashed border-[var(--dh-border)] p-4 text-sm text-muted-foreground">
-                  Todavia no hay campos calculados.
+                  Todavía no hay campos calculados.
                 </div>
               ) : null}
               <div className="space-y-3">
@@ -256,7 +271,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
                   return (
                     <div key={field.id} className="space-y-3 rounded-md border border-[var(--dh-border)] bg-muted/20 p-3">
                       <div className="grid gap-3 lg:grid-cols-[1fr_1fr_120px_150px_170px_auto]">
-                        <Field label="Nombre tecnico">
+                        <Field label="Nombre técnico">
                           <Input value={field.name} onChange={(event) => updateCalculatedField(field.id, { name: sanitizeColumnName(event.target.value) })} />
                         </Field>
                         <Field label="Etiqueta">
@@ -268,7 +283,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
                         <Field label="Formato">
                           <CompactSelect value={field.format} values={formats} onChange={(format) => updateCalculatedField(field.id, { format })} />
                         </Field>
-                        <Field label="Agregacion">
+                        <Field label="Agregación">
                           <CompactSelect
                             value={field.defaultAggregation}
                             values={aggregations}
@@ -308,7 +323,7 @@ export function DataSourceManager({ initialDatasetId, onClose }: { initialDatase
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Field label="Formula">
+                          <Field label="Fórmula">
                             <Textarea
                               value={field.formula}
                               onChange={(event) => updateCalculatedField(field.id, { formula: event.target.value })}
@@ -342,9 +357,13 @@ function CompactSelect<T extends string>({ value, values, onChange }: { value: T
   return (
     <Select value={value} onValueChange={(next) => onChange(next as T)}>
       <SelectTrigger className="w-full min-w-32"><SelectValue /></SelectTrigger>
-      <SelectContent>{values.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+      <SelectContent>{values.map((item) => <SelectItem key={item} value={item}>{optionLabel(item)}</SelectItem>)}</SelectContent>
     </Select>
   );
+}
+
+function optionLabel(value: string) {
+  return optionLabels[value] ?? value;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -377,7 +396,7 @@ function sourceLabel(value?: Dataset["sourceType"]) {
   if (value === "csv") return "CSV";
   if (value === "google_sheets") return "Google Sheets";
   if (value === "manual") return "Manual";
-  return "Unknown";
+  return "Desconocida";
 }
 
 function formatDatasetDate(value?: string) {

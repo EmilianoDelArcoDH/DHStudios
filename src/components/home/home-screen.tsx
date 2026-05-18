@@ -22,14 +22,14 @@ type ThumbnailData = {
 
 const templateOptions: TemplateOption[] = [
   { value: "blank", label: "En blanco", description: "Canvas limpio para empezar desde cero." },
-  { value: "sales", label: "Comercial", description: "Dashboard demo con KPIs, barras, linea y tabla." },
+  { value: "sales", label: "Comercial", description: "Tablero demo con KPIs, barras, línea y tabla." },
 ];
 
 export function HomeScreen() {
   const router = useRouter();
   const [projects] = useState<ProjectSummary[]>(() => reportService.getRecentProjects());
   const [projectId, setProjectId] = useState("");
-  const [projectName, setProjectName] = useState("Nuevo dashboard");
+  const [projectName, setProjectName] = useState("Nuevo tablero");
   const [template, setTemplate] = useState<ProjectTemplate>("sales");
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("updated");
@@ -56,7 +56,7 @@ export function HomeScreen() {
     setLoading("create");
     setError("");
     try {
-      const report = await reportService.createProject(projectName.trim() || "Nuevo dashboard", template);
+      const report = await reportService.createProject(projectName.trim() || "Nuevo tablero", template);
       router.push(`/editor/${report.projectId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear el proyecto.");
@@ -67,7 +67,7 @@ export function HomeScreen() {
   const openProject = async (id = projectId.trim()) => {
     const normalized = id.trim();
     if (!normalized) {
-      setError("Ingresa un projectId para abrir un proyecto.");
+      setError("Ingresá un ID de proyecto para abrirlo.");
       return;
     }
     setLoading("open");
@@ -75,7 +75,7 @@ export function HomeScreen() {
     try {
       const report = await reportService.getReportByProjectId(normalized);
       if (!report) {
-        setError("No se encontro un proyecto con ese ID.");
+        setError("No se encontró un proyecto con ese ID.");
         setLoading(null);
         return;
       }
@@ -115,9 +115,9 @@ export function HomeScreen() {
               <span className="font-heading text-xl font-semibold">DH Studio</span>
             </div>
             <div>
-              <h1 className="text-3xl font-semibold tracking-normal">Workspace</h1>
+              <h1 className="text-3xl font-semibold tracking-normal">Espacio de trabajo</h1>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Tus dashboards recientes, prototipos y reportes compartidos en un solo lugar.
+                Tus tableros recientes, prototipos y reportes compartidos en un solo lugar.
               </p>
             </div>
           </div>
@@ -150,7 +150,7 @@ export function HomeScreen() {
             <div className="flex flex-col gap-3 rounded-md border border-border bg-card p-3 shadow-sm md:flex-row md:items-center">
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input className="pl-9" placeholder="Buscar por nombre o projectId" value={query} onChange={(event) => setQuery(event.target.value)} />
+                <Input className="pl-9" placeholder="Buscar por nombre o ID de proyecto" value={query} onChange={(event) => setQuery(event.target.value)} />
               </div>
               <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
                 <SelectTrigger className="w-full md:w-48">
@@ -158,7 +158,7 @@ export function HomeScreen() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="updated">Ultima modificacion</SelectItem>
+                  <SelectItem value="updated">Última modificación</SelectItem>
                   <SelectItem value="name">Nombre</SelectItem>
                 </SelectContent>
               </Select>
@@ -189,7 +189,7 @@ export function HomeScreen() {
                   <h2 className="text-sm font-semibold">Abrir por ID</h2>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="projectId">ProjectId</Label>
+                  <Label htmlFor="projectId">ID de proyecto</Label>
                   <Input
                     id="projectId"
                     value={projectId}
@@ -246,12 +246,12 @@ function ProjectCard({ project, busy, onOpen, onDuplicate }: { project: ProjectS
             {project.isPublic ? (
               <Badge variant="secondary" className="shrink-0">
                 <Globe2 className="mr-1 h-3 w-3" />
-                Publico
+                Público
               </Badge>
             ) : null}
           </div>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{project.pageCount} {project.pageCount === 1 ? "pagina" : "paginas"}</span>
+            <span>{project.pageCount} {project.pageCount === 1 ? "página" : "páginas"}</span>
             <span>{formatDate(project.updatedAt)}</span>
           </div>
         </CardContent>
@@ -307,9 +307,9 @@ function EmptyWorkspace({ hasProjects }: { hasProjects: boolean }) {
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
         <LayoutDashboard className="h-7 w-7 text-muted-foreground" />
       </div>
-      <h2 className="mt-4 text-lg font-semibold">{hasProjects ? "No hay resultados" : "Tu workspace esta listo"}</h2>
+      <h2 className="mt-4 text-lg font-semibold">{hasProjects ? "No hay resultados" : "Tu espacio de trabajo está listo"}</h2>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-        {hasProjects ? "Prueba con otro nombre o vuelve a ordenar por fecha." : "Crea tu primer dashboard desde una plantilla o un canvas en blanco."}
+        {hasProjects ? "Probá con otro nombre o volvé a ordenar por fecha." : "Creá tu primer tablero desde una plantilla o un lienzo en blanco."}
       </p>
     </div>
   );

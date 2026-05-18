@@ -211,7 +211,7 @@ export function addDataset(report: Report, dataset: Dataset): Report {
     ...dataset,
     id: report.datasets.some((item) => item.id === dataset.id) ? uuid() : dataset.id || uuid(),
     projectId: report.projectId,
-    name: visibleDatasetName(dataset.name || "Dataset", report.datasets),
+    name: visibleDatasetName(dataset.name || "Fuente de datos", report.datasets),
     createdAt: dataset.createdAt || timestamp(),
     updatedAt: timestamp(),
   });

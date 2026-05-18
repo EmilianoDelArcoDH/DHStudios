@@ -106,9 +106,9 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
       <main className="flex h-screen flex-col items-center justify-center gap-4 bg-[var(--dh-gray-ui)] px-6 text-center">
         <h1 className="text-xl font-semibold">{loadState === "loading" ? "Cargando proyecto..." : loadState === "not-found" ? "Proyecto no encontrado" : loadState === "forbidden" ? "Proyecto no compartido" : "No se pudo abrir el proyecto"}</h1>
         <p className="max-w-md text-sm text-muted-foreground">
-          {loadState === "loading" ? projectId : loadState === "not-found" ? "No se encontró un proyecto con ese projectId." : loadState === "forbidden" ? "Este proyecto existe, pero no está marcado como público." : loadError}
+          {loadState === "loading" ? projectId : loadState === "not-found" ? "No se encontró un proyecto con ese ID." : loadState === "forbidden" ? "Este proyecto existe, pero no está marcado como público." : loadError}
         </p>
-        {loadState !== "loading" ? <Button variant="outline"><Link href="/">Volver al Home</Link></Button> : null}
+        {loadState !== "loading" ? <Button variant="outline"><Link href="/">Volver al inicio</Link></Button> : null}
       </main>
     );
   }
@@ -118,7 +118,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
       {readonly ? null : isPreview ? (
         <header className="dh-toolbar flex h-12 shrink-0 items-center gap-2 border-b px-3">
           <Eye className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Preview</span>
+          <span className="text-sm font-semibold">Vista previa</span>
           <span className="rounded-sm border border-[var(--dh-border)] bg-card px-2 py-1 font-mono text-xs text-muted-foreground">{report.projectId}</span>
           <Button variant="outline" size="sm" className="ml-auto" onClick={exitPreview}>
             <Pencil className="mr-2 h-4 w-4" />

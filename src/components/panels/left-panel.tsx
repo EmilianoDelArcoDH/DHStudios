@@ -126,7 +126,7 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
                         render={
                           <Button
                             type="button"
-                            title="Acciones de pagina"
+                            title="Acciones de página"
                             aria-label={`Acciones de ${page.name}`}
                             variant="ghost"
                             size="icon-xs"
@@ -167,7 +167,7 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
                   <span className="text-xs text-muted-foreground">{layers.length}</span>
                 </div>
                 {layers.length === 0 ? (
-                  <p className="px-1 py-2 text-xs text-muted-foreground">No hay componentes en esta pagina.</p>
+                  <p className="px-1 py-2 text-xs text-muted-foreground">No hay componentes en esta página.</p>
                 ) : null}
                 <div className="space-y-1">
                   {layers.map((widget, index) => (
@@ -215,11 +215,11 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
                     <div className="flex items-start gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-foreground" title={dataset.name}>{dataset.name}</div>
-                        <div className="mt-0.5 text-[11px] text-muted-foreground">{dataset.rows.length} filas · {dataset.columns.length} cols</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">{dataset.rows.length} filas · {dataset.columns.length} columnas</div>
                         <div className="text-[11px] text-muted-foreground">{formatDatasetDate(dataset.createdAt)}</div>
                       </div>
                       <Button
-                        title="Eliminar dataset"
+                        title="Eliminar fuente"
                         aria-label={`Eliminar ${dataset.name}`}
                         variant="ghost"
                         size="icon-sm"
@@ -249,7 +249,7 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
           <DialogHeader>
             <DialogTitle>Eliminar fuente de datos</DialogTitle>
             <DialogDescription>
-              Vas a eliminar <span className="font-medium">{datasetToDelete?.name}</span>. Los widgets que usen esta fuente quedaran sin fuente seleccionada.
+              Vas a eliminar <span className="font-medium">{datasetToDelete?.name}</span>. Los widgets que usen esta fuente quedarán sin fuente seleccionada.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -267,7 +267,7 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
       }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Eliminar pagina</DialogTitle>
+            <DialogTitle>Eliminar página</DialogTitle>
             <DialogDescription>
               Vas a eliminar <span className="font-medium">{pageToDelete?.name}</span> y todos sus componentes.
             </DialogDescription>
@@ -276,7 +276,7 @@ export function LeftPanel({ onCollapse, onManageDataset }: { onCollapse?: () => 
             <Button variant="outline" onClick={() => setPageToDelete(undefined)}>Cancelar</Button>
             <Button variant="destructive" onClick={confirmRemovePage}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar pagina
+              Eliminar página
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -334,7 +334,7 @@ function LayerRow({
         <Button title={widget.locked ? "Desbloquear" : "Bloquear"} aria-label={widget.locked ? "Desbloquear" : "Bloquear"} variant="ghost" size="icon-xs" onClick={onToggleLocked}>
           {widget.locked ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
         </Button>
-        <Button title="Enviar atras" aria-label="Enviar atras" variant="ghost" size="icon-xs" onClick={onSendToBack} disabled={isBottom}>
+        <Button title="Enviar atrás" aria-label="Enviar atrás" variant="ghost" size="icon-xs" onClick={onSendToBack} disabled={isBottom}>
           <SendToBack className="h-3 w-3" />
         </Button>
         <Button title="Traer al frente" aria-label="Traer al frente" variant="ghost" size="icon-xs" onClick={onBringToFront} disabled={isTop}>
@@ -379,17 +379,17 @@ function widgetLabel(type: WidgetType) {
     bar: "Barra",
     horizontal_bar: "Barra horizontal",
     stacked_bar: "Barra apilada",
-    line: "Linea",
-    multi_line: "Multi linea",
+    line: "Línea",
+    multi_line: "Multi línea",
     pie: "Torta",
     donut: "Dona",
-    area: "Area",
+    area: "Área",
     combo: "Combo",
-    scatter: "Dispersion",
+    scatter: "Dispersión",
     table: "Tabla",
-    pivot_table: "Tabla dinamica",
+    pivot_table: "Tabla dinámica",
     kpi: "KPI",
-    scorecard: "Scorecard",
+    scorecard: "Tarjeta",
     text: "Texto",
     image: "Imagen",
     control_text: "Control de texto",

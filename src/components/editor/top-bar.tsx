@@ -143,7 +143,7 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
               className="h-7 w-full max-w-64 border-transparent bg-transparent px-1.5 text-sm font-medium shadow-none hover:bg-muted focus-visible:border-primary focus-visible:bg-transparent focus-visible:ring-1 focus-visible:ring-primary"
             />
             <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground md:block" />
-            <span className="hidden max-w-36 truncate text-xs text-muted-foreground md:block">{activePage?.name ?? "Pagina"}</span>
+            <span className="hidden max-w-36 truncate text-xs text-muted-foreground md:block">{activePage?.name ?? "Página"}</span>
             <span className="hidden truncate font-mono text-[11px] text-muted-foreground/70 xl:inline">{report.projectId}</span>
           </div>
         </div>
@@ -183,7 +183,7 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
             </TooltipButton>
           ) : null}
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="rounded-full" title="Mas acciones" aria-label="Mas acciones" />}>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="rounded-full" title="Más acciones" aria-label="Más acciones" />}>
               <Download className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
@@ -382,16 +382,16 @@ function TopMenu({
       <MenuRoot label="Vista">
         <DropdownMenuGroup>
           <DropdownMenuItem onClick={onEdit}>Modo editar</DropdownMenuItem>
-          <DropdownMenuItem onClick={onPreview} disabled={!onPreview}>Preview</DropdownMenuItem>
+          <DropdownMenuItem onClick={onPreview} disabled={!onPreview}>Vista previa</DropdownMenuItem>
         </DropdownMenuGroup>
       </MenuRoot>
 
       <MenuRoot label="Insertar">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Graficos</DropdownMenuLabel>
-          <DropdownMenuItem onClick={() => onAddWidget("bar")}>Grafico de barras</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onAddWidget("line")}>Grafico de lineas</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onAddWidget("pie")}>Grafico de torta</DropdownMenuItem>
+          <DropdownMenuLabel>Gráficos</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => onAddWidget("bar")}>Gráfico de barras</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddWidget("line")}>Gráfico de líneas</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAddWidget("pie")}>Gráfico de torta</DropdownMenuItem>
           <DropdownMenuItem onClick={() => onAddWidget("table")}>Tabla</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
@@ -406,7 +406,7 @@ function TopMenu({
 
       <MenuRoot label="Página">
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={onAddPage}>Añadir pagina</DropdownMenuItem>
+          <DropdownMenuItem onClick={onAddPage}>Añadir página</DropdownMenuItem>
         </DropdownMenuGroup>
       </MenuRoot>
 
@@ -414,7 +414,7 @@ function TopMenu({
         <DropdownMenuGroup>
           <DropdownMenuLabel>Widget seleccionado</DropdownMenuLabel>
           <DropdownMenuItem onClick={onBringToFront} disabled={!hasSelection}>Traer al frente</DropdownMenuItem>
-          <DropdownMenuItem onClick={onSendToBack} disabled={!hasSelection}>Enviar atras</DropdownMenuItem>
+          <DropdownMenuItem onClick={onSendToBack} disabled={!hasSelection}>Enviar atrás</DropdownMenuItem>
           <DropdownMenuItem onClick={onToggleLocked} disabled={!hasSelection}>Bloquear / desbloquear</DropdownMenuItem>
         </DropdownMenuGroup>
       </MenuRoot>

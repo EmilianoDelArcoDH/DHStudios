@@ -25,6 +25,10 @@ export type WidgetType =
   | "control_select";
 export type Aggregation = "sum" | "avg" | "count" | "countDistinct" | "min" | "max";
 export type ReportMode = "edit" | "view";
+export type LegendPosition = "top" | "bottom" | "left" | "right";
+export type ValueFormat = "number" | "currency" | "percentage";
+export type ChartOrientation = "vertical" | "horizontal";
+export type ChartStylePreset = "modern" | "minimal" | "corporate" | "vibrant";
 
 export type DatasetColumn = {
   id: ID;
@@ -121,6 +125,16 @@ export type ChartConfig = {
   orderBy?: string;
   orderDirection?: "asc" | "desc";
   limit?: number;
+  colorPalette?: string[];
+  showLegend?: boolean;
+  legendPosition?: LegendPosition;
+  showGrid?: boolean;
+  smooth?: boolean;
+  stack?: boolean;
+  labelShow?: boolean;
+  valueFormat?: ValueFormat;
+  orientation?: ChartOrientation;
+  stylePreset?: ChartStylePreset;
 };
 
 export type WidgetConfig = ChartConfig;

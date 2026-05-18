@@ -39,14 +39,14 @@ export function EditorSettingsSheet({ darkMode, onDarkModeChange }: EditorSettin
     <Sheet>
       <SheetTrigger
         render={
-          <Button variant="ghost" size="icon" title="Configuracion" aria-label="Configuracion" className="h-8 w-8" />
+          <Button variant="ghost" size="icon" title="Configuración" aria-label="Configuración" className="h-8 w-8" />
         }
       >
         <Settings2 className="h-4 w-4" />
       </SheetTrigger>
       <SheetContent side="right" className="w-full border-[var(--dh-border)] bg-background sm:max-w-md">
         <SheetHeader className="border-b border-[var(--dh-border)] px-4 py-4">
-          <SheetTitle>Configuracion</SheetTitle>
+          <SheetTitle>Configuración</SheetTitle>
           <SheetDescription>
             Ajusta la apariencia de la interfaz y el tema visual del reporte.
           </SheetDescription>
@@ -61,7 +61,7 @@ export function EditorSettingsSheet({ darkMode, onDarkModeChange }: EditorSettin
             <div className="flex items-center justify-between rounded-md border border-[var(--dh-border)] bg-card px-3 py-3">
               <div className="space-y-1">
                 <Label htmlFor="editor-dark-mode">Modo oscuro</Label>
-                <p className="text-xs text-muted-foreground">Mantiene el azul DH como color de accion y foco.</p>
+                <p className="text-xs text-muted-foreground">Mantiene el azul DH como color de acción y foco.</p>
               </div>
               <Switch id="editor-dark-mode" checked={darkMode} onCheckedChange={onDarkModeChange} />
             </div>
@@ -70,7 +70,7 @@ export function EditorSettingsSheet({ darkMode, onDarkModeChange }: EditorSettin
           <section className="space-y-4 pt-4">
             <div className="space-y-1">
               <h3 className="text-sm font-semibold">Tema del reporte</h3>
-              <p className="text-xs text-muted-foreground">Estos colores impactan el canvas y los widgets del reporte.</p>
+              <p className="text-xs text-muted-foreground">Estos colores impactan el lienzo y los widgets del reporte.</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <ColorField

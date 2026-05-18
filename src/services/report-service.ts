@@ -136,7 +136,7 @@ function createReportFromTemplate(template: ProjectTemplate, name?: string) {
     return { ...report, name: name || report.name, updatedAt: new Date().toISOString() };
   }
 
-  return createEmptyReport(undefined, name || "Proyecto sin titulo");
+  return createEmptyReport(undefined, name || "Proyecto sin título");
 }
 
 function mapReport(report: DbReport, pages: DbPage[], datasets: DbDataset[], widgets: DbWidget[]): Report {
@@ -196,7 +196,7 @@ function mapReport(report: DbReport, pages: DbPage[], datasets: DbDataset[], wid
 export const reportService = {
   isEnabled: enabled,
 
-  async createProject(name = "Proyecto sin titulo", template: ProjectTemplate = "blank") {
+  async createProject(name = "Proyecto sin título", template: ProjectTemplate = "blank") {
     const report = createReportFromTemplate(template, name);
     await this.saveReport(report);
     return report;
