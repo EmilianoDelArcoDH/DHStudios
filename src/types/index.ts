@@ -34,6 +34,21 @@ export type DatasetColumn = {
 
 export type DatasetRow = Record<string, string | number | boolean | null>;
 
+export type DataSource = {
+  type: Dataset["sourceType"];
+  url?: string | null;
+  name?: string;
+};
+
+export type ColumnDef = DatasetColumnConfig;
+
+export type LayoutItem = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 export type DatasetColumnConfig = {
   name: string;
   label: string;
@@ -108,6 +123,8 @@ export type ChartConfig = {
   limit?: number;
 };
 
+export type WidgetConfig = ChartConfig;
+
 export type WidgetStyle = {
   title?: string;
   showTitle?: boolean;
@@ -145,6 +162,14 @@ export type ReportWidget = {
   createdAt: string;
   updatedAt: string;
 };
+
+export interface Widget {
+  id: ID;
+  type: WidgetType;
+  position: LayoutItem;
+  config: WidgetConfig;
+  data?: DatasetRow[];
+}
 
 export type ReportPage = {
   id: ID;
@@ -187,3 +212,5 @@ export type ReportExport = {
   exportedAt: string;
   report: Report;
 };
+
+export * from "./schemas";

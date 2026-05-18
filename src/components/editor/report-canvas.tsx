@@ -5,6 +5,7 @@ import {
   BarChart3,
   BringToFront,
   Copy,
+  ListFilter,
   Lock,
   MoreHorizontal,
   Plus,
@@ -61,6 +62,7 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
     bringWidgetToFront,
     sendWidgetToBack,
     addWidget,
+    setInteractionFilter,
   } = useEditorStore();
   const [smartGuides, setSmartGuides] = useState<SmartGuide[]>([]);
   const page =
@@ -81,6 +83,21 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
       })),
     [page.widgets],
   );
+  const activeInteractionFilters = useMemo(
+    () =>
+      Object.entries(interactionFilters)
+        .map(([sourceWidgetId, filter]) => {
+          const source = page.widgets.find((widget) => widget.id === sourceWidgetId);
+          if (!source) return undefined;
+          return { sourceWidgetId, source, filter };
+        })
+        .filter((item): item is { sourceWidgetId: string; source: ReportWidget; filter: WidgetFilter } => Boolean(item)),
+    [interactionFilters, page.widgets],
+  );
+
+  const clearInteractionFilters = () => {
+    activeInteractionFilters.forEach(({ sourceWidgetId }) => setInteractionFilter(sourceWidgetId, undefined));
+  };
 
   const setGuidesIfChanged = (nextGuides: SmartGuide[]) => {
     setSmartGuides((current) => {
@@ -162,6 +179,12 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
         ) : (
           <div className="relative min-h-[920px]">
             <SmartGuideOverlay guides={smartGuides} />
+            {activeInteractionFilters.length ? (
+              <CrossFilterBanner
+                filters={activeInteractionFilters}
+                onClear={clearInteractionFilters}
+              />
+            ) : null}
             <GridLayout
               className="min-h-[920px]"
               width={canvasWidth}
@@ -280,6 +303,55 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
       </div>
     </main>
   );
+}
+
+function CrossFilterBanner({
+  filters,
+  onClear,
+}: {
+  filters: { source: ReportWidget; filter: WidgetFilter }[];
+  onClear: () => void;
+}) {
+  const first = filters[0];
+  const label = first ? `${first.source.style.title || widgetLabel(first.source.type)}: ${String(first.filter.value)}` : "";
+  const extra = filters.length > 1 ? ` +${filters.length - 1}` : "";
+
+  return (
+    <div className="pointer-events-auto absolute right-3 top-3 z-30 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-md border border-primary/25 bg-card/95 px-2.5 py-1.5 text-xs shadow-md">
+      <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary" />
+      <span className="truncate text-muted-foreground">
+        Filtro activo: <span className="font-medium text-foreground">{label}</span>{extra}
+      </span>
+      <Button variant="ghost" size="sm" className="h-6 shrink-0 px-2 text-xs" onClick={onClear}>
+        Ver total
+      </Button>
+    </div>
+  );
+}
+
+function widgetLabel(type: ReportWidget["type"]) {
+  const labels: Record<ReportWidget["type"], string> = {
+    bar: "Barra",
+    horizontal_bar: "Barra horizontal",
+    stacked_bar: "Barra apilada",
+    line: "Linea",
+    multi_line: "Multi linea",
+    pie: "Torta",
+    donut: "Dona",
+    area: "Area",
+    combo: "Combo",
+    scatter: "Dispersion",
+    table: "Tabla",
+    pivot_table: "Tabla dinamica",
+    kpi: "KPI",
+    scorecard: "Scorecard",
+    text: "Texto",
+    image: "Imagen",
+    control_text: "Control de texto",
+    control_date: "Control de fecha",
+    control_select: "Selector",
+  };
+  return labels[type];
 }
 
 function filtersForWidget(

@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { useEditorStore } from "@/store/editor-store";
 import type { WidgetType } from "@/types";
 
-const zoomValues = [0.5, 0.75, 1, 1.25];
+const zoomValues = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
 
 const chartItems: { type: WidgetType; label: string; icon: React.ElementType }[] = [
   { type: "bar", label: "Barra", icon: BarChart3 },

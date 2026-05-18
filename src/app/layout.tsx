@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Montserrat } from "next/font/google";
+import Script from "next/script";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -27,6 +28,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${montserrat.variable} ${archivo.variable} h-full`}>
+      <head>
+        <Script
+          id="dh-appearance"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `try{document.documentElement.classList.toggle('dark',localStorage.getItem('dhstudios.appearance')==='dark')}catch{}`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col antialiased">
         <TooltipProvider>{children}</TooltipProvider>
       </body>

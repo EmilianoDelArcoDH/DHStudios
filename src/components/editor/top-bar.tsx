@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Copy, Download, Eye, FileJson, LayoutGrid, MoreHorizontal, Redo2, Save, Share2, Undo2 } from "lucide-react";
+import { Check, ChevronRight, Copy, Download, Eye, FileJson, LayoutGrid, Presentation, Save, Share2, UserCircle } from "lucide-react";
 import { EditorSettingsSheet } from "@/components/editor/editor-settings-sheet";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -18,6 +18,7 @@ const APPEARANCE_STORAGE_KEY = "dhstudios.appearance";
 export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; onPreview?: () => void }) {
   const {
     report,
+    activePageId,
     mode,
     loading,
     updateReport,
@@ -27,6 +28,7 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
     autosave,
     setReport,
   } = useEditorStore();
+  const activePage = report.pages.find((page) => page.id === activePageId) ?? report.pages[0];
   const [shareOpen, setShareOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "sharing" | "copied" | "error">("idle");
   const [darkMode, setDarkMode] = useState(() => {
@@ -131,7 +133,6 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary text-primary-foreground">
           <LayoutGrid className="h-4 w-4" />
         </div>
-        <div className="mx-1 h-6 w-px shrink-0 bg-border" />
 
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex min-w-0 items-center gap-2">
@@ -139,14 +140,16 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
               value={report.name}
               onChange={(event) => updateReport({ name: event.target.value })}
               disabled={readonly}
-              className="h-7 w-full max-w-72 border-transparent bg-transparent px-1.5 text-sm font-medium shadow-none hover:bg-muted focus-visible:border-primary focus-visible:bg-transparent focus-visible:ring-1 focus-visible:ring-primary"
+              className="h-7 w-full max-w-64 border-transparent bg-transparent px-1.5 text-sm font-medium shadow-none hover:bg-muted focus-visible:border-primary focus-visible:bg-transparent focus-visible:ring-1 focus-visible:ring-primary"
             />
-            <span className="hidden truncate font-mono text-[11px] text-muted-foreground/70 lg:inline">{report.projectId}</span>
+            <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground md:block" />
+            <span className="hidden max-w-36 truncate text-xs text-muted-foreground md:block">{activePage?.name ?? "Pagina"}</span>
+            <span className="hidden truncate font-mono text-[11px] text-muted-foreground/70 xl:inline">{report.projectId}</span>
           </div>
         </div>
 
         <div className="hidden min-w-20 shrink-0 items-center gap-1.5 text-xs text-muted-foreground sm:flex">
-          <span className={cn("h-2 w-2 rounded-full", loading ? "bg-amber-400 animate-pulse" : "bg-emerald-500")} />
+          {loading ? <Save className="h-3.5 w-3.5 animate-pulse text-amber-500" /> : <Check className="h-3.5 w-3.5 text-emerald-500" />}
           <span>{loading ? "Guardando..." : "Guardado"}</span>
         </div>
 
@@ -155,7 +158,14 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
         {!readonly ? (
           <div className="hidden items-center rounded-full border border-border bg-muted p-0.5 md:flex">
             <ModeButton active={mode === "edit"} onClick={() => setMode("edit")}>Editar</ModeButton>
-            <ModeButton active={false} onClick={() => onPreview?.()}>Preview</ModeButton>
+            <ModeButton active={mode === "view"} onClick={() => onPreview?.()}>
+              <Eye className="mr-1 h-3.5 w-3.5" />
+              Vista previa
+            </ModeButton>
+            <ModeButton active={false} onClick={() => onPreview?.()}>
+              <Presentation className="mr-1 h-3.5 w-3.5" />
+              Presentar
+            </ModeButton>
           </div>
         ) : (
           <div className="hidden items-center rounded-full border border-border bg-muted p-0.5 md:flex">
@@ -163,23 +173,7 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
           </div>
         )}
 
-        {!readonly ? (
-          <div className="hidden items-center gap-0.5 lg:flex">
-            <ToolButton label="Deshacer" shortcut="Ctrl Z" onClick={undo}><Undo2 className="h-4 w-4" /></ToolButton>
-            <ToolButton label="Rehacer" shortcut="Ctrl Y" onClick={redo}><Redo2 className="h-4 w-4" /></ToolButton>
-          </div>
-        ) : null}
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void openShareDialog()}
-            disabled={shareState === "sharing"}
-          >
-            <Share2 className="mr-1.5 h-3.5 w-3.5" />
-            {shareState === "sharing" ? "Preparando..." : "Compartir"}
-          </Button>
+        <div className="flex items-center gap-1.5">
           {!readonly ? (
             <TooltipButton label="Guardar" shortcut="Ctrl S">
               <Button variant="default" size="sm" onClick={() => void autosave()} disabled={loading}>
@@ -190,26 +184,18 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
           ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" className="rounded-full" title="Mas acciones" aria-label="Mas acciones" />}>
-              <MoreHorizontal className="h-4 w-4" />
+              <Download className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                {!readonly ? (
-                  <DropdownMenuItem onClick={() => void autosave()}>
-                    <Save className="h-4 w-4" />
-                    Guardar ahora
-                  </DropdownMenuItem>
-                ) : null}
-                {!readonly && onPreview ? (
-                  <DropdownMenuItem className="md:hidden" onClick={onPreview}>
-                    <Eye className="h-4 w-4" />
-                    Preview
-                  </DropdownMenuItem>
-                ) : null}
+                <DropdownMenuItem onClick={() => void openShareDialog()} disabled={shareState === "sharing"}>
+                  <Share2 className="h-4 w-4" />
+                  Compartir
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={download}>
-                  <Download className="h-4 w-4" />
-                  Descargar
+                  <FileJson className="h-4 w-4" />
+                  Exportar JSON
                 </DropdownMenuItem>
                 {!readonly ? (
                   <DropdownMenuItem>
@@ -224,6 +210,9 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
             </DropdownMenuContent>
           </DropdownMenu>
           {!readonly ? <EditorSettingsSheet darkMode={darkMode} onDarkModeChange={handleDarkModeChange} /> : null}
+          <Button variant="ghost" size="icon-sm" className="rounded-full" title="Usuario" aria-label="Usuario">
+            <UserCircle className="h-5 w-5" />
+          </Button>
         </div>
       </header>
 
@@ -460,14 +449,6 @@ function MenuRoot({ label, children }: { label: string; children: React.ReactNod
         {children}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-function ToolButton({ label, shortcut, onClick, children }: { label: string; shortcut: string; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <TooltipButton label={label} shortcut={shortcut}>
-      <Button title={label} aria-label={label} variant="ghost" size="icon-sm" onClick={onClick}>{children}</Button>
-    </TooltipButton>
   );
 }
 

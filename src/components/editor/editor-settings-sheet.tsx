@@ -1,21 +1,39 @@
 "use client";
 
+import type { ComponentProps } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Settings2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { useEditorStore } from "@/store/editor-store";
+import { reportThemeSchema } from "@/types";
 
 type EditorSettingsSheetProps = {
   darkMode: boolean;
   onDarkModeChange: (checked: boolean) => void;
 };
 
+type ReportThemeForm = z.infer<typeof reportThemeSchema>;
+
 export function EditorSettingsSheet({ darkMode, onDarkModeChange }: EditorSettingsSheetProps) {
   const reportTheme = useEditorStore((state) => state.report.theme);
   const updateTheme = useEditorStore((state) => state.updateTheme);
+  const form = useForm<ReportThemeForm>({
+    resolver: zodResolver(reportThemeSchema),
+    values: reportTheme,
+    mode: "onChange",
+  });
+
+  const updateThemeField = async (field: keyof Pick<ReportThemeForm, "primary" | "accent" | "pageBackground">, value: string) => {
+    form.setValue(field, value, { shouldDirty: true, shouldValidate: true });
+    const valid = await form.trigger(field);
+    if (valid) updateTheme({ [field]: value });
+  };
 
   return (
     <Sheet>
@@ -55,9 +73,27 @@ export function EditorSettingsSheet({ darkMode, onDarkModeChange }: EditorSettin
               <p className="text-xs text-muted-foreground">Estos colores impactan el canvas y los widgets del reporte.</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <ColorField label="Primario" value={reportTheme.primary} onChange={(value) => updateTheme({ primary: value })} />
-              <ColorField label="Acento" value={reportTheme.accent} onChange={(value) => updateTheme({ accent: value })} />
-              <ColorField label="Hoja" value={reportTheme.pageBackground} onChange={(value) => updateTheme({ pageBackground: value })} />
+              <ColorField
+                label="Primario"
+                value={reportTheme.primary}
+                {...form.register("primary")}
+                onChange={(event) => void updateThemeField("primary", event.target.value)}
+                error={form.formState.errors.primary?.message}
+              />
+              <ColorField
+                label="Acento"
+                value={reportTheme.accent}
+                {...form.register("accent")}
+                onChange={(event) => void updateThemeField("accent", event.target.value)}
+                error={form.formState.errors.accent?.message}
+              />
+              <ColorField
+                label="Hoja"
+                value={reportTheme.pageBackground}
+                {...form.register("pageBackground")}
+                onChange={(event) => void updateThemeField("pageBackground", event.target.value)}
+                error={form.formState.errors.pageBackground?.message}
+              />
             </div>
           </section>
         </div>
@@ -66,11 +102,12 @@ export function EditorSettingsSheet({ darkMode, onDarkModeChange }: EditorSettin
   );
 }
 
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function ColorField({ label, error, ...inputProps }: ComponentProps<typeof Input> & { label: string; error?: string }) {
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input type="color" value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input type="color" {...inputProps} />
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }

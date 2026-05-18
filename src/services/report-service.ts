@@ -1,11 +1,22 @@
 "use client";
 
 import type { Dataset, Report, ReportPage, ReportWidget, WidgetType } from "@/types";
-import { createEmptyReport } from "@/lib/demo-data";
+import { createDemoReport, createEmptyReport } from "@/lib/demo-data";
 import { createClient } from "@/lib/supabase/client";
 
 const enabled = () => Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 const storageKey = (projectId: string) => `dh-project:${projectId}`;
+const workspaceKey = "dh-projects:index";
+
+export type ProjectTemplate = "blank" | "sales";
+export type ProjectSummary = {
+  projectId: string;
+  name: string;
+  updatedAt: string;
+  pageCount: number;
+  isPublic: boolean;
+  thumbnail?: string;
+};
 
 type DbReport = {
   id?: string;
@@ -58,12 +69,74 @@ type DbWidget = {
 function persistLocal(report: Report) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(storageKey(report.projectId), JSON.stringify(report));
+  upsertProjectSummary(report);
 }
 
 function readLocal(projectId: string) {
   if (typeof window === "undefined") return null;
   const value = window.localStorage.getItem(storageKey(projectId));
   return value ? (JSON.parse(value) as Report) : null;
+}
+
+function reportSummary(report: Report): ProjectSummary {
+  return {
+    projectId: report.projectId,
+    name: report.name,
+    updatedAt: report.updatedAt,
+    pageCount: report.pages.length,
+    isPublic: report.isPublic,
+    thumbnail: createThumbnail(report),
+  };
+}
+
+function readProjectIndex() {
+  if (typeof window === "undefined") return [];
+  const value = window.localStorage.getItem(workspaceKey);
+  if (!value) return [];
+  try {
+    return JSON.parse(value) as ProjectSummary[];
+  } catch {
+    window.localStorage.removeItem(workspaceKey);
+    return [];
+  }
+}
+
+function writeProjectIndex(projects: ProjectSummary[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(workspaceKey, JSON.stringify(projects));
+}
+
+function upsertProjectSummary(report: Report) {
+  const summary = reportSummary(report);
+  const projects = readProjectIndex().filter((project) => project.projectId !== summary.projectId);
+  writeProjectIndex([summary, ...projects].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()));
+}
+
+function createThumbnail(report: Report) {
+  const page = report.pages[0];
+  if (!page) return undefined;
+
+  return JSON.stringify({
+    theme: report.theme,
+    widgets: page.widgets.slice(0, 8).map((widget) => ({
+      id: widget.id,
+      type: widget.type,
+      x: widget.x,
+      y: widget.y,
+      w: widget.w,
+      h: widget.h,
+      color: widget.style.seriesColors?.[0] ?? report.theme.primary,
+    })),
+  });
+}
+
+function createReportFromTemplate(template: ProjectTemplate, name?: string) {
+  if (template === "sales") {
+    const report = createDemoReport();
+    return { ...report, name: name || report.name, updatedAt: new Date().toISOString() };
+  }
+
+  return createEmptyReport(undefined, name || "Proyecto sin titulo");
 }
 
 function mapReport(report: DbReport, pages: DbPage[], datasets: DbDataset[], widgets: DbWidget[]): Report {
@@ -123,8 +196,52 @@ function mapReport(report: DbReport, pages: DbPage[], datasets: DbDataset[], wid
 export const reportService = {
   isEnabled: enabled,
 
-  async createProject(name = "Proyecto sin título") {
-    const report = createEmptyReport(crypto.randomUUID(), name);
+  async createProject(name = "Proyecto sin titulo", template: ProjectTemplate = "blank") {
+    const report = createReportFromTemplate(template, name);
+    await this.saveReport(report);
+    return report;
+  },
+
+  getRecentProjects() {
+    return readProjectIndex();
+  },
+
+  async duplicateProject(projectId: string) {
+    const source = await this.getReportByProjectId(projectId);
+    if (!source) return null;
+
+    const now = new Date().toISOString();
+    const nextProjectId = crypto.randomUUID();
+    const pageIdBySource = new Map(source.pages.map((page) => [page.id, crypto.randomUUID()]));
+    const report: Report = {
+      ...source,
+      id: undefined,
+      projectId: nextProjectId,
+      name: `${source.name} copia`,
+      isPublic: false,
+      pages: source.pages.map((page) => {
+        const nextPageId = pageIdBySource.get(page.id) ?? crypto.randomUUID();
+        return {
+          ...page,
+          id: nextPageId,
+          projectId: nextProjectId,
+          widgets: page.widgets.map((widget) => ({
+            ...widget,
+            id: crypto.randomUUID(),
+            projectId: nextProjectId,
+            pageId: nextPageId,
+            createdAt: now,
+            updatedAt: now,
+          })),
+          createdAt: now,
+          updatedAt: now,
+        };
+      }),
+      datasets: source.datasets.map((dataset) => ({ ...dataset, projectId: nextProjectId, createdAt: now, updatedAt: now })),
+      createdAt: now,
+      updatedAt: now,
+    };
+
     await this.saveReport(report);
     return report;
   },

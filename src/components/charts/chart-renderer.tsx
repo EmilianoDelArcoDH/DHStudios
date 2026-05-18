@@ -355,7 +355,15 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
 
   return (
     <div className="relative h-full">
-      <ChartQuickActions widget={widget} dataset={dataset} chartData={chartData} onMetricChange={(metric) => updateWidget(widget.id, { config: { ...widget.config, activeOptionalMetric: metric } })} onDrillDown={drillDown} onResetDrill={resetDrill} />
+      <ChartQuickActions
+        widget={widget}
+        dataset={dataset}
+        interactionFilter={interactionFilter}
+        onMetricChange={(metric) => updateWidget(widget.id, { config: { ...widget.config, activeOptionalMetric: metric } })}
+        onDrillDown={drillDown}
+        onResetDrill={resetDrill}
+        onClearInteractionFilter={() => setInteractionFilter(widget.id, undefined)}
+      />
       <MeasuredChart option={option} onCategoryClick={handleCategoryClick} />
     </div>
   );
@@ -451,17 +459,19 @@ function readableColumnName(column: string) {
 function ChartQuickActions({
   widget,
   dataset,
-  chartData,
+  interactionFilter,
   onMetricChange,
   onDrillDown,
   onResetDrill,
+  onClearInteractionFilter,
 }: {
   widget: ReportWidget;
   dataset?: Dataset;
-  chartData: ReturnType<typeof buildChartData>;
+  interactionFilter?: WidgetFilter;
   onMetricChange: (metric?: string) => void;
   onDrillDown: () => void;
   onResetDrill: () => void;
+  onClearInteractionFilter: () => void;
 }) {
   const optionalMetrics = widget.config.optionalMetrics ?? [];
   const drillDimensions = widget.config.drillDimensions ?? [];
@@ -482,10 +492,24 @@ function ChartQuickActions({
   // }
 
   return (
-    <div>
+    <div className="absolute right-2 top-2 z-10 flex max-w-[calc(100%-1rem)] items-center gap-1">
+      {interactionFilter ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 max-w-44 bg-card/95 px-2 text-xs shadow-sm"
+          title={`Filtro activo: ${String(interactionFilter.value)}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClearInteractionFilter();
+          }}
+        >
+          <span className="truncate">Ver total</span>
+        </Button>
+      ) : null}
       {metricOptions.length ? (
         <Select value={widget.config.activeOptionalMetric ?? ""} onValueChange={(value) => onMetricChange(value || undefined)}>
-          <SelectTrigger className="h-7 w-32 px-2 text-xs">
+          <SelectTrigger className="h-7 w-32 bg-card/95 px-2 text-xs shadow-sm">
             <SelectValue placeholder="Metrica" />
           </SelectTrigger>
           <SelectContent>
@@ -502,25 +526,6 @@ function ChartQuickActions({
       {/* <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={exportCsv}>CSV</Button> */}
     </div>
   );
-}
-
-function chartDataToCsv(chartData: ReturnType<typeof buildChartData>) {
-  const header = ["dimension", ...chartData.series.map((serie) => serie.name)];
-  const rows = chartData.categories.map((category, index) => [
-    category,
-    ...chartData.series.map((serie) => String(serie.data[index] ?? "")),
-  ]);
-  return [header, ...rows].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\n");
-}
-
-function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 function PivotTable({
