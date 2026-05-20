@@ -394,6 +394,7 @@ function sanitizeColumnName(value: string) {
 
 function sourceLabel(value?: Dataset["sourceType"]) {
   if (value === "csv") return "CSV";
+  if (value === "xlsx") return "XLSX";
   if (value === "google_sheets") return "Google Sheets";
   if (value === "manual") return "Manual";
   return "Desconocida";

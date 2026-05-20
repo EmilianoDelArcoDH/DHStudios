@@ -9,8 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useEditorStore } from "@/store/editor-store";
-import type { Aggregation, ColumnType, Dataset, ReportWidget, WidgetFilter, WidgetMetric, WidgetStyle, WidgetType } from "@/types";
-import { aggregationOrFallback, getDatasetColumnConfig, getVisibleDatasetColumns } from "@/lib/dataset";
+import type { Aggregation, ColumnType, ContentAlign, Dataset, DimensionGroupingMode, LegendLayout, ReportWidget, WidgetFilter, WidgetMetric, WidgetStyle, WidgetType } from "@/types";
+import { aggregationOrFallback, getDatasetColumnConfig, getVisibleDatasetColumns, isRecordCountMetric, RECORD_COUNT_LABEL, RECORD_COUNT_METRIC } from "@/lib/dataset";
 import { cn } from "@/lib/utils";
 import type { DataModel, DatasetRelationship } from "@/lib/data-model/types";
 
@@ -48,6 +48,27 @@ const stylePresetLabels: Record<NonNullable<ReportWidget["config"]["stylePreset"
   corporate: "Corporativo",
   vibrant: "Vibrante",
 };
+const dimensionGroupingLabels: Record<DimensionGroupingMode, string> = {
+  none: "Todas",
+  top_n: "Las primeras N",
+  bottom_n: "Las últimas N",
+};
+
+const contentAlignLabels: Record<ContentAlign, string> = {
+  left: "Izquierda",
+  center: "Centro",
+  right: "Derecha",
+};
+const textAlignLabels: Record<NonNullable<WidgetStyle["textAlign"]>, string> = {
+  left: "Izquierda",
+  center: "Centro",
+  right: "Derecha",
+  justify: "Justificado",
+};
+const legendLayoutLabels: Record<LegendLayout, string> = {
+  auto: "Automática",
+  list: "Lista",
+};
 
 const cartesianChartTypes: ChartTypeOption[] = [
   { value: "bar", label: "Barra vertical" },
@@ -77,6 +98,12 @@ const scoreTypes = new Set(scoreChartTypes.map((item) => item.value));
 
 type ChartTypeOption = { value: WidgetType; label: string };
 type ColumnOption = { name: string; label?: string; type: ColumnType; defaultAggregation?: import("@/types").AggregationType };
+const recordCountOption: ColumnOption = {
+  name: RECORD_COUNT_METRIC,
+  label: RECORD_COUNT_LABEL,
+  type: "number",
+  defaultAggregation: "count",
+};
 
 function metricKey(metric: string | WidgetMetric) {
   return typeof metric === "string" ? metric : metric.column ?? metric.id;
@@ -136,6 +163,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
   const setStyle = (patch: Partial<WidgetStyle>) => updateWidget(widget.id, { style: { ...widget.style, ...patch } });
   const columns = dataset ? getVisibleDatasetColumns(dataset) : [];
   const metricColumns = columns.filter((column) => column.type === "number");
+  const aggregateMetricColumns = [...metricColumns, recordCountOption];
   const dimensionColumns = getDimensionColumns(report.datasets, dataModel, widget.config.datasetId);
   const selectedMetrics = (widget.config.metrics ?? (widget.config.metric ? [widget.config.metric] : [])).map(metricKey);
   const seriesColors = widget.style.seriesColors?.length ? widget.style.seriesColors : defaultSeriesColors;
@@ -150,10 +178,14 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
   const isPivot = widget.type === "pivot_table";
   const isControl = widget.type.startsWith("control");
   const showDataSource = isScore || isScatter || isPie || isCartesian || isTable || isControl;
+  const showDimensionGrouping = isPie || isCartesian;
   const controlColumns = widget.type === "control_date" ? columns.filter((column) => column.type === "date") : columns;
 
   const setSingleDimension = (dimension?: string) => setConfig({ dimension, dimensions: dimension ? [dimension] : [] });
-  const suggestedAggregation = (metric?: string) => aggregationOrFallback(metricColumns.find((column) => column.name === metric)?.defaultAggregation, widget.config.aggregation);
+  const suggestedAggregation = (metric?: string) => {
+    if (isRecordCountMetric(metric)) return "count";
+    return aggregationOrFallback(aggregateMetricColumns.find((column) => column.name === metric)?.defaultAggregation, widget.config.aggregation);
+  };
   const setSingleMetric = (metric?: string) => setConfig({ metric, metrics: metric ? [metric] : [], aggregation: suggestedAggregation(metric) });
   const setScatterMetric = (index: number, metric?: string) => {
     const next = [...selectedMetrics];
@@ -239,7 +271,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           {isScore ? (
             <>
-              <SingleColumnSelect label="Métrica" value={widget.config.metric} columns={metricColumns} onChange={setSingleMetric} />
+              <SingleColumnSelect label="Métrica" value={widget.config.metric} columns={aggregateMetricColumns} onChange={setSingleMetric} />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
             </>
           ) : null}
@@ -255,7 +287,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
           {isPie ? (
             <>
               <SingleColumnSelect label="Dimensión" value={widget.config.dimension} columns={dimensionColumns} onChange={setSingleDimension} />
-              <SingleColumnSelect label="Métrica" value={widget.config.metric} columns={metricColumns} onChange={setSingleMetric} />
+              <SingleColumnSelect label="Métrica" value={widget.config.metric} columns={aggregateMetricColumns} onChange={setSingleMetric} />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
             </>
           ) : null}
@@ -272,18 +304,34 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
               <ColumnList
                 label="Métricas"
                 values={selectedMetrics}
-                columns={metricColumns}
+                columns={aggregateMetricColumns}
                 addLabel="Agregar métrica"
                 onChange={(metrics) => setConfig({ metrics, metric: metrics[0], aggregation: suggestedAggregation(metrics[0]) })}
               />
               <AggregationField value={widget.config.aggregation} onChange={(aggregation) => setConfig({ aggregation })} />
-              <Field label="Orden">
-                <Select value={widget.config.orderDirection ?? "asc"} onValueChange={(value) => setConfig({ orderDirection: value as "asc" | "desc" })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="asc">Ascendente</SelectItem><SelectItem value="desc">Descendente</SelectItem></SelectContent>
-                </Select>
-              </Field>
-              <LimitField value={widget.config.limit} onChange={(limit) => setConfig({ limit })} />
+            </>
+          ) : null}
+
+          {showDimensionGrouping ? (
+            <>
+              <DimensionGroupingField
+                mode={widget.config.dimensionGroupingMode ?? "none"}
+                limit={widget.config.limit}
+                groupRemainingAsOthers={widget.config.groupRemainingAsOthers ?? true}
+                showLimitWhenNone={isCartesian}
+                onChange={(patch) => setConfig(patch)}
+              />
+              {isCartesian && (widget.config.dimensionGroupingMode ?? "none") === "none" ? (
+                <>
+                  <Field label="Orden">
+                    <Select value={widget.config.orderDirection ?? "asc"} onValueChange={(value) => setConfig({ orderDirection: value as "asc" | "desc" })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="asc">Ascendente</SelectItem><SelectItem value="desc">Descendente</SelectItem></SelectContent>
+                    </Select>
+                  </Field>
+                  <LimitField value={widget.config.limit} onChange={(limit) => setConfig({ limit })} />
+                </>
+              ) : null}
             </>
           ) : null}
 
@@ -304,7 +352,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
               <ColumnList
                 label="Métricas opcionales"
                 values={(widget.config.optionalMetrics ?? []).map(metricKey)}
-                columns={metricColumns}
+                columns={aggregateMetricColumns}
                 addLabel="Agregar métrica opcional"
                 onChange={(optionalMetrics) => setConfig({ optionalMetrics, activeOptionalMetric: optionalMetrics[0] })}
               />
@@ -319,6 +367,13 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
                 columns={dimensionColumns}
                 addLabel="Agregar columna"
                 onChange={(dimensions) => setConfig({ dimensions, dimension: dimensions[0] })}
+              />
+              <ColumnList
+                label="Metricas"
+                values={selectedMetrics.filter((metric) => !isRecordCountMetric(metric))}
+                columns={metricColumns}
+                addLabel="Agregar metrica"
+                onChange={(metrics) => setConfig({ metrics, metric: metrics[0], aggregation: suggestedAggregation(metrics[0]) })}
               />
               <LimitField value={widget.config.limit} onChange={(limit) => setConfig({ limit })} />
             </>
@@ -342,7 +397,7 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
               <ColumnList
                 label="Métricas"
                 values={selectedMetrics}
-                columns={metricColumns}
+                columns={aggregateMetricColumns}
                 addLabel="Agregar métrica"
                 onChange={(metrics) => setConfig({ metrics, metric: metrics[0], aggregation: suggestedAggregation(metrics[0]) })}
               />
@@ -363,11 +418,12 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
           ) : null}
 
           <BasicStyleControls style={widget.style} setStyle={setStyle} compact={isImage} />
+          {!isImage ? <TypographyStyleControls style={widget.style} setStyle={setStyle} showContentAlign={isScore} /> : null}
 
           {isPie ? (
             <>
               <div className="flex items-center justify-between"><Label>Leyenda</Label><Switch checked={widget.config.showLegend ?? widget.style.showLegend ?? true} onCheckedChange={(showLegend) => setConfig({ showLegend })} /></div>
-              <div className="flex items-center justify-between"><Label>% en torta/dona</Label><Switch checked={widget.style.showPiePercent ?? false} onCheckedChange={(showPiePercent) => setStyle({ showPiePercent })} /></div>
+              <div className="flex items-center justify-between"><Label>% en torta/dona</Label><Switch checked={widget.style.showPiePercent ?? true} onCheckedChange={(showPiePercent) => setStyle({ showPiePercent })} /></div>
               <ChartAppearanceOptions widget={widget} setConfig={setConfig} compact />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Radio interno"><Input type="number" min={0} max={80} value={widget.style.pieInnerRadius ?? 0} onChange={(event) => setStyle({ pieInnerRadius: Number(event.target.value) })} /></Field>
@@ -391,6 +447,17 @@ export function RightPanel({ onCollapse }: { onCollapse?: () => void }) {
 
           {isScatter || isPie || isCartesian ? <SeriesColorControls colors={seriesColors} setStyle={setStyle} /> : null}
 
+          {isTable ? (
+            <>
+              <div className="flex items-center justify-between"><Label>Mapa de calor</Label><Switch checked={widget.style.showHeatmap ?? false} onCheckedChange={(showHeatmap) => setStyle({ showHeatmap })} /></div>
+              {widget.style.showHeatmap ? (
+                <Field label="Color mapa de calor">
+                  <Input type="color" value={widget.style.heatmapColor ?? "#22c55e"} onChange={(event) => setStyle({ heatmapColor: event.target.value })} />
+                </Field>
+              ) : null}
+            </>
+          ) : null}
+
           <Separator />
           <DataModelControls reportDatasets={report.datasets} dataModel={dataModel} updateDataModel={updateDataModel} />
         </TabsContent>
@@ -403,6 +470,70 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
 }
 
+function TypographyStyleControls({
+  style,
+  setStyle,
+  showContentAlign = false,
+}: {
+  style: WidgetStyle;
+  setStyle: (patch: Partial<WidgetStyle>) => void;
+  showContentAlign?: boolean;
+}) {
+  const fontSize = style.fontSize ?? 14;
+  const textAlign = style.textAlign ?? "left";
+  const contentAlign = style.contentAlign ?? "left";
+  const isBold = (style.fontWeight ?? "normal") === "bold";
+  const isItalic = (style.fontStyle ?? "normal") === "italic";
+  const isUnderline = (style.textDecoration ?? "none") === "underline";
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Tamano texto (px)">
+          <Input
+            type="number"
+            min={8}
+            max={72}
+            value={fontSize}
+            onChange={(event) => setStyle({ fontSize: Number(event.target.value) })}
+          />
+        </Field>
+        <Field label="Alinear texto">
+          <Select value={textAlign} onValueChange={(value) => setStyle({ textAlign: value as WidgetStyle["textAlign"] })}>
+            <SelectTrigger><span>{textAlignLabels[textAlign]}</span></SelectTrigger>
+            <SelectContent>
+              {Object.entries(textAlignLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+      {showContentAlign ? (
+        <Field label="Alinear bloque">
+          <Select value={contentAlign} onValueChange={(value) => setStyle({ contentAlign: value as ContentAlign })}>
+            <SelectTrigger><span>{contentAlignLabels[contentAlign]}</span></SelectTrigger>
+            <SelectContent>
+              {Object.entries(contentAlignLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+      ) : null}
+      <Field label="Estilo de texto">
+        <div className="grid grid-cols-3 gap-2">
+          <Button type="button" variant={isBold ? "default" : "outline"} className="w-full" onClick={() => setStyle({ fontWeight: isBold ? "normal" : "bold" })}>
+            Negrita
+          </Button>
+          <Button type="button" variant={isItalic ? "default" : "outline"} className="w-full italic" onClick={() => setStyle({ fontStyle: isItalic ? "normal" : "italic" })}>
+            Italica
+          </Button>
+          <Button type="button" variant={isUnderline ? "default" : "outline"} className="w-full underline" onClick={() => setStyle({ textDecoration: isUnderline ? "none" : "underline" })}>
+            Subrayado
+          </Button>
+        </div>
+      </Field>
+    </>
+  );
+}
+
 function ChartAppearanceOptions({
   widget,
   setConfig,
@@ -413,6 +544,8 @@ function ChartAppearanceOptions({
   compact?: boolean;
 }) {
   const legendPosition = widget.config.legendPosition ?? "bottom";
+  const legendAlign = widget.config.legendAlign ?? "center";
+  const legendLayout = widget.config.legendLayout ?? "auto";
   const valueFormat = widget.config.valueFormat ?? "number";
   const stylePreset = widget.config.stylePreset ?? "modern";
 
@@ -424,6 +557,24 @@ function ChartAppearanceOptions({
             <SelectTrigger><span>{legendPositionLabels[legendPosition]}</span></SelectTrigger>
             <SelectContent>
               {Object.entries(legendPositionLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Alinear leyenda">
+          <Select value={legendAlign} onValueChange={(nextLegendAlign) => setConfig({ legendAlign: nextLegendAlign as ContentAlign })}>
+            <SelectTrigger><span>{contentAlignLabels[legendAlign]}</span></SelectTrigger>
+            <SelectContent>
+              {Object.entries(contentAlignLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Layout leyenda">
+          <Select value={legendLayout} onValueChange={(nextLegendLayout) => setConfig({ legendLayout: nextLegendLayout as LegendLayout })}>
+            <SelectTrigger><span>{legendLayoutLabels[legendLayout]}</span></SelectTrigger>
+            <SelectContent>
+              {Object.entries(legendLayoutLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
             </SelectContent>
           </Select>
         </Field>
@@ -850,6 +1001,44 @@ function AggregationField({ value, onChange }: { value: Aggregation; onChange: (
         <SelectContent>{aggregations.map((item) => <SelectItem key={item} value={item}>{aggregationLabels[item]}</SelectItem>)}</SelectContent>
       </Select>
     </Field>
+  );
+}
+
+function DimensionGroupingField({
+  mode,
+  limit,
+  groupRemainingAsOthers,
+  showLimitWhenNone = true,
+  onChange,
+}: {
+  mode: DimensionGroupingMode;
+  limit?: number;
+  groupRemainingAsOthers: boolean;
+  showLimitWhenNone?: boolean;
+  onChange: (patch: Partial<ReportWidget["config"]>) => void;
+}) {
+  return (
+    <>
+      <Field label="Mostrar">
+        <Select value={mode} onValueChange={(next) => onChange({ dimensionGroupingMode: next as DimensionGroupingMode })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {Object.entries(dimensionGroupingLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </Field>
+      {mode !== "none" || showLimitWhenNone ? (
+        <Field label={mode === "none" ? "Limite de filas" : "Numero de porciones"}>
+          <Input type="number" min={1} max={500} value={limit ?? 10} onChange={(event) => onChange({ limit: Number(event.target.value) })} />
+        </Field>
+      ) : null}
+      {mode !== "none" ? (
+        <div className="flex items-center justify-between">
+          <Label>Agrupar resto como Otros</Label>
+          <Switch checked={groupRemainingAsOthers} onCheckedChange={(next) => onChange({ groupRemainingAsOthers: next })} />
+        </div>
+      ) : null}
+    </>
   );
 }
 

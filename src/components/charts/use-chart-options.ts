@@ -30,35 +30,47 @@ function buildChartOption(widget: ReportWidget, chartData: ChartData): ChartOpti
   const firstMetric = chartData.series[0];
   const showLegend = config.showLegend ?? style.showLegend ?? true;
   const labelShow = config.labelShow ?? style.showDataLabels ?? false;
+  const legendListMode = (config.legendLayout ?? "auto") === "list" || (widget.type === "pie" || widget.type === "donut") && chartData.categories.length > 8;
 
   if (widget.type === "pie" || widget.type === "donut") {
     const pieData = chartData.categories.map((name, index) => ({ name, value: firstMetric?.data[index] ?? 0 }));
     const total = pieData.reduce((sum, item) => sum + Number(item.value ?? 0), 0);
-    const requestedPieOuterRadius = style.pieOuterRadius ?? 58;
-    const pieOuterRadius = showLegend ? Math.min(Math.max(requestedPieOuterRadius, 66), 72) : requestedPieOuterRadius;
+    const requestedPieOuterRadius = style.pieOuterRadius ?? 62;
+    const pieOuterRadius = showLegend && legendListMode ? Math.min(Math.max(requestedPieOuterRadius, 82), 88) : showLegend ? Math.min(Math.max(requestedPieOuterRadius, 72), 82) : requestedPieOuterRadius;
     const pieRadius = widget.type === "donut"
       ? [`${style.pieInnerRadius ?? 45}%`, `${pieOuterRadius}%`]
       : [`${style.pieInnerRadius ?? 0}%`, `${pieOuterRadius}%`];
+    const pieCenter = showLegend && legendListMode ? ["30%", "52%"] : ["50%", showLegend ? "42%" : "50%"];
+    const pieBottom = showLegend && !legendListMode ? 58 : 0;
+    const piePercentEnabled = style.showPiePercent ?? true;
+    const pieLabelShow = labelShow || piePercentEnabled;
 
     return {
       ...baseChartOptions,
       ...pieChartOptions,
       color: colors,
       tooltip: getPieTooltipOption(config, total),
-      legend: getLegendOption(config, style),
+      legend: legendListMode
+        ? { ...getLegendOption({ ...config, legendLayout: "list" }, style), right: 4, top: 28, bottom: 12, width: "28%" }
+        : getLegendOption(config, style),
       series: [{
         type: "pie",
         radius: pieRadius,
-        center: ["50%", showLegend ? "42%" : "50%"],
+        center: pieCenter,
         top: 0,
-        bottom: showLegend ? 58 : 0,
+        bottom: pieBottom,
         avoidLabelOverlap: true,
         label: {
-          show: labelShow,
-          formatter: style.showPiePercent ? "{b}: {d}%" : "{b}",
-          fontSize: 11,
+          show: pieLabelShow,
+          position: piePercentEnabled ? "inside" : "outside",
+          formatter: piePercentEnabled ? "{d}%" : "{b}",
+          fontSize: style.fontSize ?? 11,
+          color: piePercentEnabled ? "#ffffff" : undefined,
+          fontWeight: style.fontWeight ?? "normal",
+          fontStyle: style.fontStyle ?? "normal",
         },
-        labelLine: { show: labelShow, length: 8, length2: 8 },
+        labelLine: { show: !piePercentEnabled && pieLabelShow, length: 8, length2: 8 },
+        minShowLabelAngle: piePercentEnabled ? 3 : 0,
         data: pieData,
         emphasis: {
           scale: true,
@@ -72,7 +84,7 @@ function buildChartOption(widget: ReportWidget, chartData: ChartData): ChartOpti
   if (widget.type === "scatter") {
     const [xMetric, yMetric] = chartData.metrics;
     const rows = chartData.rows.slice(0, config.limit ?? 50);
-    const axisStyle = getAxisStyle(config);
+    const axisStyle = getAxisStyle(config, style);
     return {
       ...baseChartOptions,
       color: colors,
@@ -95,7 +107,7 @@ function buildChartOption(widget: ReportWidget, chartData: ChartData): ChartOpti
   const isHorizontal = orientation === "horizontal";
   const isStacked = widget.type === "stacked_bar" || config.stack || style.stackSeries;
   const isLineLike = widget.type === "line" || widget.type === "multi_line" || widget.type === "area";
-  const axisStyle = getAxisStyle(config);
+  const axisStyle = getAxisStyle(config, style);
   const totalByName = new Map(chartData.series.map((item) => [item.name, item.data.reduce((sum, value) => sum + Number(value ?? 0), 0)]));
 
   const series = chartData.series.map((item, index) => {
@@ -120,7 +132,9 @@ function buildChartOption(widget: ReportWidget, chartData: ChartData): ChartOpti
       label: {
         show: labelShow,
         position: isHorizontal ? "right" : "top",
-        fontSize: 11,
+        fontSize: style.fontSize ?? 11,
+        fontWeight: style.fontWeight ?? "normal",
+        fontStyle: style.fontStyle ?? "normal",
       },
       data: item.data,
       barMaxWidth: type === "bar" ? 42 : undefined,

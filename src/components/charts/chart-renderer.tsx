@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { Component, memo, useCallback, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import type { ChartConfig, ColumnFormat, Dataset, DatasetColumnConfig, DatasetRow, ReportWidget, WidgetFilter, WidgetMetric } from "@/types";
-import { aggregate, applyCalculatedFields, applyFilters, getDatasetColumnConfig, getVisibleDatasetColumns } from "@/lib/dataset";
+import { aggregate, applyCalculatedFields, applyFilters, getDatasetColumnConfig, getVisibleDatasetColumns, isRecordCountMetric, RECORD_COUNT_LABEL, RECORD_COUNT_METRIC } from "@/lib/dataset";
 import { executeWidgetQuery, queryFieldFromKey } from "@/lib/data-model/query";
 import type { DataModel } from "@/lib/data-model/types";
 import { useEditorStore } from "@/store/editor-store";
@@ -12,12 +12,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { useChartOptions } from "./use-chart-options";
 
 const ReactECharts = dynamic(() => import("echarts-for-react"), {
   ssr: false,
   loading: () => <ChartLoadingState label="Cargando gráfico..." />,
 });
+
+const GROUPED_OTHERS_LABEL = "Otros";
+
+function textStyleFromWidget(widget: ReportWidget) {
+  return {
+    color: widget.style.color,
+    fontFamily: widget.style.fontFamily,
+    fontSize: widget.style.fontSize ? `${widget.style.fontSize}px` : undefined,
+    fontWeight: widget.style.fontWeight ?? "normal",
+    fontStyle: widget.style.fontStyle ?? "normal",
+    textDecoration: widget.style.textDecoration ?? "none",
+    textAlign: widget.style.textAlign ?? "left",
+  } as const;
+}
 
 type Props = {
   widget: ReportWidget;
@@ -38,17 +53,30 @@ function activeDimensions(config: ChartConfig) {
 }
 
 function activeMetricConfigs(config: ChartConfig): WidgetMetric[] {
+  const recordCountMetric: WidgetMetric = { id: RECORD_COUNT_METRIC, label: RECORD_COUNT_LABEL, aggregation: "count" };
   const metrics = config.metrics?.filter(Boolean).map((metric) => (
     typeof metric === "string"
-      ? { id: metric, column: metric, label: metric, aggregation: config.aggregation }
+      ? isRecordCountMetric(metric)
+        ? recordCountMetric
+        : { id: metric, column: metric, label: metric, aggregation: config.aggregation }
       : metric
   )) ?? [];
   const activeOptionalMetric = config.activeOptionalMetric;
   if (activeOptionalMetric) {
     const optional = (config.optionalMetrics ?? []).find((metric) => metricKey(metric) === activeOptionalMetric);
-    if (optional) return [typeof optional === "string" ? { id: optional, column: optional, label: optional, aggregation: config.aggregation } : optional];
+    if (optional) {
+      return [typeof optional === "string"
+        ? isRecordCountMetric(optional)
+          ? recordCountMetric
+          : { id: optional, column: optional, label: optional, aggregation: config.aggregation }
+        : optional];
+    }
   }
-  return metrics.length ? metrics : config.metric ? [{ id: config.metric, column: config.metric, label: config.metric, aggregation: config.aggregation }] : [];
+  if (metrics.length) return metrics;
+  if (!config.metric) return [];
+  return isRecordCountMetric(config.metric)
+    ? [recordCountMetric]
+    : [{ id: config.metric, column: config.metric, label: config.metric, aggregation: config.aggregation }];
 }
 
 function metricKey(metric: string | WidgetMetric) {
@@ -57,6 +85,57 @@ function metricKey(metric: string | WidgetMetric) {
 
 function activeMetrics(config: ChartConfig) {
   return activeMetricConfigs(config).map((metric) => metric.column ?? metric.id);
+}
+
+function applyDimensionGrouping(
+  categories: string[],
+  series: { name: string; data: number[] }[],
+  config: ChartConfig,
+) {
+  const limit = config.limit ?? 50;
+  if (!categories.length || !series.length) {
+    return {
+      categories: categories.slice(0, limit),
+      series: series.map((item) => ({ ...item, data: item.data.slice(0, limit) })),
+    };
+  }
+
+  const groupingMode = config.dimensionGroupingMode ?? "none";
+  if (groupingMode === "top_n" || groupingMode === "bottom_n") {
+    const zipped = categories.map((category, index) => ({ category, index, value: series[0]?.data[index] ?? 0 }));
+    zipped.sort((a, b) => groupingMode === "top_n" ? b.value - a.value : a.value - b.value);
+
+    const selected = zipped.slice(0, limit);
+    const remainder = zipped.slice(limit);
+    const groupedCategories = selected.map((item) => item.category);
+    const groupedSeries = series.map((item) => ({
+      ...item,
+      data: selected.map((selectedItem) => item.data[selectedItem.index] ?? 0),
+    }));
+
+    if (config.groupRemainingAsOthers && remainder.length) {
+      groupedCategories.push(GROUPED_OTHERS_LABEL);
+      groupedSeries.forEach((item, seriesIndex) => {
+        const othersValue = remainder.reduce((sum, remainderItem) => sum + Number(series[seriesIndex]?.data[remainderItem.index] ?? 0), 0);
+        item.data.push(othersValue);
+      });
+    }
+
+    return { categories: groupedCategories, series: groupedSeries };
+  }
+
+  const slicedCategories = categories.slice(0, limit);
+  const slicedSeries = series.map((item) => ({ ...item, data: item.data.slice(0, limit) }));
+  if (config.orderDirection === "desc" && slicedSeries[0]) {
+    const zipped = slicedCategories.map((category, index) => ({ category, index, value: slicedSeries[0].data[index] ?? 0 }));
+    zipped.sort((a, b) => b.value - a.value);
+    return {
+      categories: zipped.map((item) => item.category),
+      series: slicedSeries.map((item) => ({ ...item, data: zipped.map((zippedItem) => item.data[zippedItem.index] ?? 0) })),
+    };
+  }
+
+  return { categories: slicedCategories, series: slicedSeries };
 }
 
 function rowLabel(row: DatasetRow, dimensions: string[]) {
@@ -82,8 +161,8 @@ function buildChartData(dataset: Dataset | undefined, config: ChartConfig) {
     groups.set(label, [...(groups.get(label) ?? []), row]);
   });
 
-  const categories = Array.from(groups.keys()).slice(0, config.limit ?? 50);
-  const series = (metricConfigs.length ? metricConfigs : [{ id: "registros", label: "registros", aggregation: "count" as const }]).map((metric) => ({
+  const categories = Array.from(groups.keys());
+  const series = (metricConfigs.length ? metricConfigs : [{ id: RECORD_COUNT_METRIC, label: RECORD_COUNT_LABEL, aggregation: "count" as const }]).map((metric) => ({
     name: metric.label,
     data: categories.map((category) => {
       const groupedRows = groups.get(category) ?? [];
@@ -92,26 +171,15 @@ function buildChartData(dataset: Dataset | undefined, config: ChartConfig) {
     }),
   }));
 
-  if (config.orderDirection === "desc" && series[0]) {
-    const zipped = categories.map((category, index) => ({ category, index, value: series[0].data[index] ?? 0 }));
-    zipped.sort((a, b) => b.value - a.value);
-    return {
-      dimensions,
-      metrics,
-      rows,
-      categories: zipped.map((item) => item.category),
-      series: series.map((item) => ({ ...item, data: zipped.map((zippedItem) => item.data[zippedItem.index] ?? 0) })),
-    };
-  }
-
-  return { dimensions, metrics, rows, categories, series };
+  const grouped = applyDimensionGrouping(categories, series, config);
+  return { dimensions, metrics, rows, categories: grouped.categories, series: grouped.series };
 }
 
 function validateWidget(dataset: Dataset | undefined, config: ChartConfig) {
   if (!dataset) return "Seleccioná una fuente de datos.";
   const columns = new Set(getDatasetColumnConfig(dataset).map((column) => column.name));
   const missingDimension = activeDimensions(config).find((dimension) => !columns.has(dimension));
-  const missingMetric = activeMetrics(config).find((metric) => metric && !columns.has(metric));
+  const missingMetric = activeMetrics(config).find((metric) => metric && !isRecordCountMetric(metric) && !columns.has(metric));
   if (missingDimension) return `La dimensión no es válida: ${readableColumnName(missingDimension)}.`;
   if (missingMetric) return `La métrica no es válida: ${readableColumnName(missingMetric)}.`;
   return "";
@@ -122,22 +190,29 @@ function buildModelChartData(datasets: Dataset[] | undefined, dataModel: DataMod
   if (!baseDatasetId || !datasets?.length) return undefined;
 
   const dimensions = activeDimensions(config).map((key) => queryFieldFromKey(key, baseDatasetId));
-  const metrics = activeMetrics(config).map((key) => queryFieldFromKey(key, baseDatasetId));
+  const metricConfigs = activeMetricConfigs(config);
+  const metrics = metricConfigs.map((metric) => queryFieldFromKey(metric.column ?? metric.id, baseDatasetId));
   const hasModelField = [...dimensions, ...metrics].some((field) => field.datasetId !== baseDatasetId);
   if (!hasModelField && !dataModel?.relationships.length) return undefined;
 
-  return executeWidgetQuery(
+  const result = executeWidgetQuery(
     {
       baseDatasetId,
       dimensions,
       metrics,
       aggregation: config.aggregation,
-      limit: config.limit,
-      orderDirection: config.orderDirection,
     },
     datasets,
     dataModel,
   );
+  const grouped = applyDimensionGrouping(result.categories, result.series, config);
+
+  return {
+    ...result,
+    metrics: metricConfigs.map((metric) => metric.column ?? metric.id),
+    categories: grouped.categories,
+    series: grouped.series.map((series, index) => ({ ...series, name: metricConfigs[index]?.label ?? series.name })),
+  };
 }
 
 function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters = [], onClearInteractionFilters }: Props) {
@@ -150,9 +225,13 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
     [dataModel, dataset, datasets, effectiveConfig],
   );
   const option = useChartOptions({ widget, chartData });
+  const chartKey = useMemo(
+    () => `${widget.id}:${widget.type}:${chartData.categories.join("|")}:${chartData.series.map((item) => `${item.name}:${item.data.join(",")}`).join("|")}`,
+    [chartData.categories, chartData.series, widget.id, widget.type],
+  );
 
   if (widget.type === "text") {
-    return <div className="whitespace-pre-wrap p-3 text-sm" style={{ color: widget.style.color }}>{widget.style.text}</div>;
+    return <div className="whitespace-pre-wrap p-3" style={textStyleFromWidget(widget)}>{widget.style.text}</div>;
   }
 
   if (widget.type === "image") {
@@ -173,6 +252,7 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
 
   const handleCategoryClick = (category: string) => {
     const dimension = activeDimensions(widget.config)[0];
+    if (category === GROUPED_OTHERS_LABEL && (widget.config.dimensionGroupingMode ?? "none") !== "none") return;
     if (!dimension || widget.config.enableCrossFilter === false) return;
     const current = interactionFilter?.operator === "equals" ? String(interactionFilter.value) : "";
     setInteractionFilter(widget.id, current === category ? undefined : { column: dimension, operator: "equals", value: category });
@@ -192,16 +272,23 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
   };
 
   if (widget.type === "table") {
-    const selectedColumns = activeDimensions(widget.config);
+    const selectedColumns = widget.config.dimensions?.filter(Boolean) ?? [];
+    const selectedMetricColumns = activeMetricConfigs(widget.config)
+      .map((metric) => metric.column ?? metric.id)
+      .filter((metric): metric is string => Boolean(metric) && !isRecordCountMetric(metric));
     const fallbackColumns = getVisibleDatasetColumns(dataset).map((column) => column.name);
+    const tableColumnKeys = [...(selectedColumns.length ? selectedColumns : fallbackColumns), ...selectedMetricColumns.filter((metric) => !selectedColumns.includes(metric))];
+    const tableColumnLabels = buildColumnLabelMap(tableColumnKeys, dataset, datasets);
     return (
       <DataTable
+        widget={widget}
         rows={chartData.rows}
-        columnKeys={selectedColumns.length ? selectedColumns : fallbackColumns}
+        columnKeys={tableColumnKeys}
+        columnLabels={tableColumnLabels}
         columnConfigs={getDatasetColumnConfig(dataset)}
         limit={widget.config.limit ?? 20}
         onRowClick={(row) => {
-          const dimension = activeDimensions(widget.config)[0] ?? selectedColumns[0];
+          const dimension = selectedColumns[0] ?? fallbackColumns[0];
           const value = dimension ? row[dimension] : undefined;
           if (value !== undefined && value !== null) handleCategoryClick(String(value));
         }}
@@ -213,6 +300,7 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
     const [rowDimension, columnDimension] = widget.config.dimensions ?? [];
     return (
       <PivotTable
+        widget={widget}
         rows={chartData.rows}
         rowDimension={rowDimension}
         columnDimension={columnDimension}
@@ -227,12 +315,14 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
   if (widget.type === "kpi" || widget.type === "scorecard") {
     const value = chartData.series[0]?.data[0] ?? 0;
     const metricConfig = getDatasetColumnConfig(dataset).find((column) => column.name === widget.config.metric);
+    const metricLabel = isRecordCountMetric(widget.config.metric) ? RECORD_COUNT_LABEL : metricConfig?.label ?? widget.config.metric ?? "registros";
     const showTitle = widget.style.showTitle ?? true;
+    const contentAlign = widget.style.contentAlign ?? "left";
     return (
-      <div className="flex h-full flex-col justify-center px-4">
-        {showTitle ? <span className="text-xs text-muted-foreground">{widget.style.title}</span> : null}
-        <strong className="font-mono text-3xl tracking-normal">{formatValue(value, metricConfig?.format)}</strong>
-        <span className="text-xs text-muted-foreground">{widget.config.aggregation} de {metricConfig?.label ?? widget.config.metric ?? "registros"}</span>
+      <div className={cn("flex h-full flex-col justify-center px-4", contentAlign === "center" && "items-center", contentAlign === "right" && "items-end")} style={{ textAlign: contentAlign }}>
+        {showTitle ? <span className="text-xs text-muted-foreground" style={textStyleFromWidget(widget)}>{widget.style.title}</span> : null}
+        <strong className="font-mono text-3xl tracking-normal" style={{ ...textStyleFromWidget(widget), fontSize: widget.style.fontSize ? `${Math.max(widget.style.fontSize + 14, 24)}px` : undefined }}>{formatValue(value, metricConfig?.format)}</strong>
+        <span className="text-xs text-muted-foreground" style={textStyleFromWidget(widget)}>{widget.config.aggregation} de {metricLabel}</span>
       </div>
     );
   }
@@ -249,7 +339,7 @@ function ChartRendererBase({ widget, dataset, datasets, dataModel, globalFilters
         onClearInteractionFilter={() => setInteractionFilter(widget.id, undefined)}
       />
       <WidgetChartBoundary>
-        <MeasuredChart option={option} onCategoryClick={handleCategoryClick} onBlankClick={onClearInteractionFilters} />
+        <MeasuredChart chartKey={chartKey} option={option} onCategoryClick={handleCategoryClick} onBlankClick={onClearInteractionFilters} />
       </WidgetChartBoundary>
     </div>
   );
@@ -280,7 +370,7 @@ type ChartInstance = {
   };
 };
 
-function MeasuredChart({ option, onCategoryClick, onBlankClick }: { option: object; onCategoryClick?: (category: string) => void; onBlankClick?: () => void }) {
+function MeasuredChart({ chartKey, option, onCategoryClick, onBlankClick }: { chartKey: string; option: object; onCategoryClick?: (category: string) => void; onBlankClick?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const chartResizeObserverRef = useRef<ResizeObserver | null>(null);
   const blankClickRef = useRef(onBlankClick);
@@ -349,6 +439,7 @@ function MeasuredChart({ option, onCategoryClick, onBlankClick }: { option: obje
     <div ref={ref} className="chart-container h-full min-h-[320px] w-full min-w-0">
       {ready ? (
         <ReactECharts
+          key={chartKey}
           option={option}
           onEvents={{ click: (params: { name?: string }) => params.name ? onCategoryClick?.(String(params.name)) : undefined }}
           style={{ height: "100%", width: "100%" }}
@@ -356,7 +447,7 @@ function MeasuredChart({ option, onCategoryClick, onBlankClick }: { option: obje
           onChartReady={handleChartReady}
           notMerge
           lazyUpdate
-          autoResize
+          autoResize={false}
         />
       ) : (
         <ChartLoadingState label="Preparando gráfico..." />
@@ -365,18 +456,19 @@ function MeasuredChart({ option, onCategoryClick, onBlankClick }: { option: obje
   );
 }
 
-function DataTable({ rows, columnKeys, columnConfigs, limit, onRowClick }: { rows: DatasetRow[]; columnKeys: string[]; columnConfigs: DatasetColumnConfig[]; limit: number; onRowClick?: (row: DatasetRow) => void }) {
+function DataTable({ widget, rows, columnKeys, columnLabels, columnConfigs, limit, onRowClick }: { widget: ReportWidget; rows: DatasetRow[]; columnKeys: string[]; columnLabels?: Map<string, string>; columnConfigs: DatasetColumnConfig[]; limit: number; onRowClick?: (row: DatasetRow) => void }) {
   const configByName = useMemo(() => new Map(columnConfigs.map((column) => [column.name, column])), [columnConfigs]);
+  const data = useMemo(() => rows.slice(0, limit), [rows, limit]);
+  const heatmapStats = useMemo(() => buildColumnHeatmapStats(data, columnKeys, configByName), [columnKeys, configByName, data]);
   const columns = useMemo(
     () => columnKeys.map((column) => ({
       id: column,
       accessorFn: (row: DatasetRow) => row[column],
-      header: configByName.get(column)?.label ?? readableColumnName(column),
+      header: columnLabels?.get(column) ?? configByName.get(column)?.label ?? readableColumnName(column),
       cell: (info: { getValue: () => unknown }) => formatValue(info.getValue(), configByName.get(column)?.format),
     })),
-    [columnKeys, configByName],
+    [columnKeys, columnLabels, configByName],
   );
-  const data = useMemo(() => rows.slice(0, limit), [rows, limit]);
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
 
@@ -393,7 +485,19 @@ function DataTable({ rows, columnKeys, columnConfigs, limit, onRowClick }: { row
         <TableBody>
           {table.getRowModel().rows.map((row) => (
             <TableRow key={row.id} className={onRowClick ? "cursor-pointer" : undefined} onClick={() => onRowClick?.(row.original)}>
-              {row.getVisibleCells().map((cell) => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}
+              {row.getVisibleCells().map((cell) => {
+                const columnKey = cell.column.id;
+                const value = row.original[columnKey];
+                return (
+                  <TableCell
+                    key={cell.id}
+                    className={cn(configByName.get(columnKey)?.type === "number" && "text-right")}
+                    style={heatmapCellStyle(value, heatmapStats.get(columnKey), widget)}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           ))}
         </TableBody>
@@ -429,7 +533,7 @@ function ChartQuickActions({
   const metricOptions = optionalMetrics.map((metric) => {
     const key = metricKey(metric);
     const columnLabel = dataset ? getDatasetColumnConfig(dataset).find((column) => column.name === key)?.label : undefined;
-    return { key, label: typeof metric === "string" ? columnLabel ?? metric : metric.label };
+    return { key, label: typeof metric === "string" ? (isRecordCountMetric(key) ? RECORD_COUNT_LABEL : columnLabel ?? metric) : metric.label };
   });
 
   // const exportCsv = () => downloadCsv(`${widget.style.title ?? "grafico"}.csv`, chartDataToCsv(chartData));
@@ -481,6 +585,7 @@ function ChartQuickActions({
 }
 
 function PivotTable({
+  widget,
   rows,
   rowDimension,
   columnDimension,
@@ -489,6 +594,7 @@ function PivotTable({
   aggregation,
   limit,
 }: {
+  widget: ReportWidget;
   rows: DatasetRow[];
   rowDimension?: string;
   columnDimension?: string;
@@ -500,13 +606,16 @@ function PivotTable({
   if (!rowDimension || !columnDimension) return <InvalidWidget label="Configura filas y columnas para la tabla dinámica." />;
   const rowLabels = Array.from(new Set(rows.map((row) => String(row[rowDimension] ?? "Sin valor")))).slice(0, limit);
   const columnLabels = Array.from(new Set(rows.map((row) => String(row[columnDimension] ?? "Sin valor")))).slice(0, 30);
-  const metricColumn = metric?.column ?? metric?.id;
+  const metricColumn = isRecordCountMetric(metric?.id) ? undefined : metric?.column ?? metric?.id;
   const metricConfig = columnConfigs.find((column) => column.name === metricColumn);
 
   const cellValue = (rowLabelValue: string, columnLabelValue: string) => {
     const grouped = rows.filter((row) => String(row[rowDimension] ?? "Sin valor") === rowLabelValue && String(row[columnDimension] ?? "Sin valor") === columnLabelValue);
     return aggregate(metricColumn ? grouped.map((row) => row[metricColumn]) : grouped.map(() => 1), metric?.aggregation ?? aggregation);
   };
+  const heatmapStats = buildValueHeatmapStats(
+    rowLabels.flatMap((rowLabelValue) => columnLabels.map((columnLabelValue) => cellValue(rowLabelValue, columnLabelValue))),
+  );
 
   return (
     <div className="h-full overflow-auto">
@@ -524,7 +633,15 @@ function PivotTable({
             return (
               <TableRow key={rowLabelValue}>
                 <TableCell className="font-medium">{rowLabelValue}</TableCell>
-                {values.map((value, index) => <TableCell key={`${rowLabelValue}-${columnLabels[index]}`} className="text-right">{formatValue(value, metricConfig?.format ?? "number")}</TableCell>)}
+                {values.map((value, index) => (
+                  <TableCell
+                    key={`${rowLabelValue}-${columnLabels[index]}`}
+                    className="text-right"
+                    style={heatmapCellStyle(value, heatmapStats, widget)}
+                  >
+                    {formatValue(value, metricConfig?.format ?? "number")}
+                  </TableCell>
+                ))}
                 <TableCell className="text-right font-semibold">{formatValue(values.reduce((sum, value) => sum + value, 0), metricConfig?.format ?? "number")}</TableCell>
               </TableRow>
             );
@@ -552,7 +669,7 @@ function ControlWidget({ widget, dataset }: { widget: ReportWidget; dataset?: Da
     const selectedValue = typeof value === "string" ? value : "";
     return (
       <div className="flex h-full flex-col justify-center gap-2 p-3">
-        {showTitle ? <span className="text-xs font-medium text-muted-foreground">{widget.style.title || label}</span> : null}
+        {showTitle ? <span className="text-xs font-medium text-muted-foreground" style={textStyleFromWidget(widget)}>{widget.style.title || label}</span> : null}
         <Select value={selectedValue || "__all__"} onValueChange={(next) => setControlValue(widget.id, !next || next === "__all__" ? undefined : next)}>
           <SelectTrigger className="w-full">
             <SelectValue />
@@ -570,7 +687,7 @@ function ControlWidget({ widget, dataset }: { widget: ReportWidget; dataset?: Da
     const range = Array.isArray(value) ? value : ["", ""];
     return (
       <div className="flex h-full flex-col justify-center gap-2 p-3">
-        {showTitle ? <span className="text-xs font-medium text-muted-foreground">{widget.style.title || label}</span> : null}
+        {showTitle ? <span className="text-xs font-medium text-muted-foreground" style={textStyleFromWidget(widget)}>{widget.style.title || label}</span> : null}
         <div className="grid grid-cols-2 gap-2">
           <Input type="date" value={range[0]} onChange={(event) => setControlValue(widget.id, [event.target.value, range[1]])} />
           <Input type="date" value={range[1]} onChange={(event) => setControlValue(widget.id, [range[0], event.target.value])} />
@@ -583,7 +700,7 @@ function ControlWidget({ widget, dataset }: { widget: ReportWidget; dataset?: Da
   const textValue = typeof value === "string" ? value : "";
   return (
     <div className="flex h-full flex-col justify-center gap-2 p-3">
-      {showTitle ? <span className="text-xs font-medium text-muted-foreground">{widget.style.title || label}</span> : null}
+      {showTitle ? <span className="text-xs font-medium text-muted-foreground" style={textStyleFromWidget(widget)}>{widget.style.title || label}</span> : null}
       <Input value={textValue} onChange={(event) => setControlValue(widget.id, event.target.value ? event.target.value : undefined)} placeholder="Filtrar..." />
     </div>
   );
@@ -591,6 +708,73 @@ function ControlWidget({ widget, dataset }: { widget: ReportWidget; dataset?: Da
 
 function uniqueColumnValues(dataset: Dataset, column: string) {
   return Array.from(new Set(dataset.rows.map((row) => row[column]).filter((value) => value !== null && value !== undefined && value !== "").map(String))).sort((a, b) => a.localeCompare(b));
+}
+
+function buildColumnLabelMap(columnKeys: string[], dataset?: Dataset, datasets?: Dataset[]) {
+  const labels = new Map<string, string>();
+  const currentDatasetConfig = dataset ? new Map(getDatasetColumnConfig(dataset).map((column) => [column.name, column.label])) : new Map<string, string>();
+  const datasetById = new Map((datasets ?? []).map((item) => [item.id, item]));
+
+  columnKeys.forEach((columnKey) => {
+    const separator = columnKey.indexOf(".");
+    if (separator === -1) {
+      labels.set(columnKey, currentDatasetConfig.get(columnKey) ?? readableColumnName(columnKey));
+      return;
+    }
+
+    const datasetId = columnKey.slice(0, separator);
+    const columnName = columnKey.slice(separator + 1);
+    const relatedDataset = datasetById.get(datasetId);
+    const relatedLabel = relatedDataset
+      ? getDatasetColumnConfig(relatedDataset).find((column) => column.name === columnName)?.label
+      : undefined;
+    labels.set(columnKey, relatedLabel ?? readableColumnName(columnKey));
+  });
+
+  return labels;
+}
+
+function buildColumnHeatmapStats(rows: DatasetRow[], columnKeys: string[], configByName: Map<string, DatasetColumnConfig>) {
+  return new Map(
+    columnKeys.map((columnKey) => {
+      const columnConfig = configByName.get(columnKey);
+      if (columnConfig?.type !== "number") return [columnKey, undefined] as const;
+      const values = rows.map((row) => Number(row[columnKey])).filter((value) => Number.isFinite(value));
+      return [columnKey, buildValueHeatmapStats(values)] as const;
+    }),
+  );
+}
+
+function buildValueHeatmapStats(values: number[]) {
+  if (!values.length) return undefined;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return { min, max };
+}
+
+function heatmapCellStyle(value: unknown, stats: { min: number; max: number } | undefined, widget: ReportWidget) {
+  if (!(widget.style.showHeatmap ?? false) || !stats) return undefined;
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return undefined;
+
+  const range = stats.max - stats.min;
+  const normalized = range <= 0 ? 1 : (numericValue - stats.min) / range;
+  const alpha = 0.08 + normalized * 0.34;
+  return {
+    backgroundColor: toRgba(widget.style.heatmapColor ?? "#22c55e", alpha),
+  };
+}
+
+function toRgba(hex: string, alpha: number) {
+  const normalized = hex.replace("#", "");
+  const expanded = normalized.length === 3
+    ? normalized.split("").map((char) => `${char}${char}`).join("")
+    : normalized;
+  const safeHex = expanded.length === 6 ? expanded : "22c55e";
+  const r = Number.parseInt(safeHex.slice(0, 2), 16);
+  const g = Number.parseInt(safeHex.slice(2, 4), 16);
+  const b = Number.parseInt(safeHex.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
 }
 
 function formatValue(value: unknown, format: ColumnFormat = "text") {

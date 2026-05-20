@@ -7,25 +7,37 @@ export type ChartOption = Record<string, unknown>;
 export function getLegendOption(config: ChartConfig, style: WidgetStyle) {
   const show = config.showLegend ?? style.showLegend ?? true;
   const position = config.legendPosition ?? "bottom";
+  const layout = config.legendLayout ?? "auto";
+  const align = config.legendAlign ?? "center";
+  const listMode = layout === "list";
+  const fontSize = Math.max(10, (style.fontSize ?? 12) - 1);
   const base = {
     show,
-    type: "scroll",
+    type: listMode ? "plain" : "scroll",
     icon: "roundRect",
-    itemGap: 20,
+    itemGap: listMode ? 8 : 20,
     itemWidth: 12,
     itemHeight: 8,
-    textStyle: { fontSize: 12, color: getChartTheme(config).textColor },
+    textStyle: {
+      fontSize,
+      color: getChartTheme(config).textColor,
+      align,
+      fontWeight: style.fontWeight ?? "normal",
+      fontStyle: style.fontStyle ?? "normal",
+      textDecoration: style.textDecoration ?? "none",
+    },
   };
 
   return {
     ...base,
-    ...legendPlacement(position),
+    ...legendPlacement(position, align, listMode),
   };
 }
 
 export function getGridOption(config: ChartConfig, style: WidgetStyle, chartType?: WidgetType) {
   const showLegend = config.showLegend ?? style.showLegend ?? true;
   const position = config.legendPosition ?? "bottom";
+  const listMode = (config.legendLayout ?? "auto") === "list";
   if (!showLegend || position === "bottom") {
     if (chartType === "bar" || chartType === "horizontal_bar" || chartType === "stacked_bar") {
       return { left: "10%", right: "5%", top: "15%", bottom: showLegend ? "12%" : "8%", containLabel: true };
@@ -40,18 +52,25 @@ export function getGridOption(config: ChartConfig, style: WidgetStyle, chartType
 
   return {
     top: position === "top" ? "18%" : "12%",
-    right: position === "right" ? "18%" : "5%",
+    right: position === "right" ? (listMode ? "26%" : "18%") : "5%",
     bottom: "8%",
-    left: position === "left" ? "18%" : "8%",
+    left: position === "left" ? (listMode ? "26%" : "18%") : "8%",
     containLabel: true,
   };
 }
 
-export function getAxisStyle(config: ChartConfig) {
+export function getAxisStyle(config: ChartConfig, style?: WidgetStyle) {
   const theme = getChartTheme(config);
   const showGrid = config.showGrid ?? true;
+  const fontSize = Math.max(10, (style?.fontSize ?? 12) - 1);
   return {
-    axisLabel: { color: theme.textColor, fontSize: 11, padding: [5, 0, 0, 0] },
+    axisLabel: {
+      color: theme.textColor,
+      fontSize,
+      padding: [5, 0, 0, 0],
+      fontWeight: style?.fontWeight ?? "normal",
+      fontStyle: style?.fontStyle ?? "normal",
+    },
     axisLine: { lineStyle: { color: theme.axisColor } },
     axisTick: { lineStyle: { color: theme.axisColor } },
     splitLine: { show: showGrid, lineStyle: { color: theme.gridColor, type: "dashed" } },
@@ -97,11 +116,16 @@ export function getPieTooltipOption(config: ChartConfig, total: number) {
   };
 }
 
-function legendPlacement(position: LegendPosition) {
-  if (position === "top") return { top: 0, left: 10, right: 10 };
+function legendPlacement(position: LegendPosition, align: ChartConfig["legendAlign"], listMode: boolean) {
+  if (listMode) {
+    if (position === "left") return { left: 8, top: 28, bottom: 12, orient: "vertical" };
+    return { right: 8, top: 28, bottom: 12, orient: "vertical" };
+  }
+
+  if (position === "top") return { top: 0, left: align === "left" ? 10 : align === "right" ? undefined : "center", right: align === "right" ? 10 : undefined };
   if (position === "left") return { left: 8, top: 28, bottom: 12, orient: "vertical" };
   if (position === "right") return { right: 8, top: 28, bottom: 12, orient: "vertical" };
-  return { bottom: 0, left: 10, right: 10 };
+  return { bottom: 0, left: align === "left" ? 10 : align === "right" ? undefined : "center", right: align === "right" ? 10 : undefined };
 }
 
 function formatTooltip(params: unknown, config: ChartConfig, totalByName?: Map<string, number>) {

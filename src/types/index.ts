@@ -29,6 +29,10 @@ export type LegendPosition = "top" | "bottom" | "left" | "right";
 export type ValueFormat = "number" | "currency" | "percentage";
 export type ChartOrientation = "vertical" | "horizontal";
 export type ChartStylePreset = "modern" | "minimal" | "corporate" | "vibrant";
+export type DimensionGroupingMode = "none" | "top_n" | "bottom_n";
+export type ContentAlign = "left" | "center" | "right";
+export type LegendLayout = "auto" | "list";
+export type TextAlign = "left" | "center" | "right" | "justify";
 
 export type DatasetColumn = {
   id: ID;
@@ -79,7 +83,7 @@ export type Dataset = {
   projectId: ID;
   ownerId?: ID;
   name: string;
-  sourceType: "csv" | "google_sheets" | "manual" | "unknown";
+  sourceType: "csv" | "xlsx" | "google_sheets" | "manual" | "unknown";
   sourceUrl?: string | null;
   columns: DatasetColumn[];
   columnConfig?: DatasetColumnConfig[];
@@ -125,9 +129,13 @@ export type ChartConfig = {
   orderBy?: string;
   orderDirection?: "asc" | "desc";
   limit?: number;
+  dimensionGroupingMode?: DimensionGroupingMode;
+  groupRemainingAsOthers?: boolean;
   colorPalette?: string[];
   showLegend?: boolean;
   legendPosition?: LegendPosition;
+  legendAlign?: ContentAlign;
+  legendLayout?: LegendLayout;
   showGrid?: boolean;
   smooth?: boolean;
   stack?: boolean;
@@ -144,6 +152,11 @@ export type WidgetStyle = {
   showTitle?: boolean;
   fontFamily?: string;
   fontSize?: number;
+  contentAlign?: ContentAlign;
+  textAlign?: TextAlign;
+  fontWeight?: "normal" | "bold";
+  fontStyle?: "normal" | "italic";
+  textDecoration?: "none" | "underline";
   color?: string;
   background?: string;
   borderColor?: string;
@@ -157,6 +170,8 @@ export type WidgetStyle = {
   showDataLabels?: boolean;
   showPiePercent?: boolean;
   stackSeries?: boolean;
+  showHeatmap?: boolean;
+  heatmapColor?: string;
   imageUrl?: string;
   text?: string;
 };

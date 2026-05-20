@@ -266,7 +266,18 @@ export function ReportCanvas({ preview = false }: { preview?: boolean }) {
                       />
                     ) : null}
                     {hasCanvasTitle ? (
-                      <div className="dh-widget-drag-handle h-8 cursor-move px-3 pt-2 text-sm font-semibold">
+                      <div
+                        className="dh-widget-drag-handle h-8 cursor-move px-3 pt-2 text-sm font-semibold"
+                        style={{
+                          color: widget.style.color,
+                          fontFamily: widget.style.fontFamily,
+                          fontSize: widget.style.fontSize ? `${widget.style.fontSize}px` : undefined,
+                          fontWeight: widget.style.fontWeight ?? "normal",
+                          fontStyle: widget.style.fontStyle ?? "normal",
+                          textDecoration: widget.style.textDecoration ?? "none",
+                          textAlign: widget.style.textAlign ?? "left",
+                        }}
+                      >
                         {widget.style.title}
                       </div>
                     ) : null}

@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { read, utils } from "xlsx";
 import { v4 as uuid } from "uuid";
 import type {
   Aggregation,
@@ -14,16 +15,29 @@ import type {
   WidgetMetric,
 } from "@/types";
 
+export const RECORD_COUNT_METRIC = "__record_count";
+export const RECORD_COUNT_LABEL = "Record Count";
+
 const numberLike = (value: unknown) => value !== "" && value !== null && !Number.isNaN(Number(value));
 const aggregationValues: Aggregation[] = ["sum", "avg", "min", "max", "count", "countDistinct"];
+const booleanLike = (value: unknown) => {
+  const normalized = String(value).toLowerCase();
+  return normalized === "true" || normalized === "false";
+};
 
 export function inferColumnType(values: unknown[]): ColumnType {
   const present = values.filter((value) => value !== "" && value !== null && value !== undefined);
   if (present.length === 0) return "text";
-  if (present.every((value) => value === "true" || value === "false" || typeof value === "boolean")) return "boolean";
+  if (present.every((value) => booleanLike(value) || typeof value === "boolean")) return "boolean";
   if (present.every(numberLike)) return "number";
-  if (present.every((value) => !Number.isNaN(Date.parse(String(value))))) return "date";
+  if (present.every((value) => value instanceof Date || !Number.isNaN(Date.parse(String(value))))) return "date";
   return "text";
+}
+
+function normalizeDateValue(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
 }
 
 export function normalizeRows(rows: Record<string, unknown>[], columns: DatasetColumn[]): DatasetRow[] {
@@ -33,10 +47,55 @@ export function normalizeRows(rows: Record<string, unknown>[], columns: DatasetC
       const value = row[column.name];
       if (column.type === "number") next[column.name] = numberLike(value) ? Number(value) : null;
       else if (column.type === "boolean") next[column.name] = value === true || String(value).toLowerCase() === "true";
+      else if (column.type === "date") next[column.name] = normalizeDateValue(value);
       else next[column.name] = value === undefined || value === "" ? null : String(value);
     });
     return next;
   });
+}
+
+function sanitizeRawRows(rows: Record<string, unknown>[]) {
+  return rows.map((row) =>
+    Object.fromEntries(
+      Object.entries(row)
+        .map(([key, value]) => [key.trim(), value] as const)
+        .filter(([key]) => key.length > 0),
+    ),
+  );
+}
+
+function buildDatasetFromRows(
+  name: string,
+  rawRows: Record<string, unknown>[],
+  sourceType: Dataset["sourceType"],
+  sourceUrl?: string,
+  projectId = "",
+): Dataset {
+  const rows = sanitizeRawRows(rawRows);
+  const keys = Object.keys(rows[0] ?? {});
+
+  if (!keys.length) {
+    throw new Error("La fuente no tiene columnas con encabezados legibles.");
+  }
+
+  const columns = keys.map((key) => ({
+    id: uuid(),
+    name: key,
+    type: inferColumnType(rows.map((row) => row[key])),
+  }));
+
+  const timestamp = new Date().toISOString();
+  return {
+    id: uuid(),
+    projectId,
+    name,
+    sourceType,
+    sourceUrl,
+    columns,
+    rows: normalizeRows(rows, columns),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
 }
 
 function defaultFormatForType(type: ColumnType): ColumnFormat {
@@ -51,6 +110,10 @@ function defaultAggregationForType(type: ColumnType): AggregationType {
 
 export function isAggregation(value: AggregationType): value is Aggregation {
   return aggregationValues.includes(value as Aggregation);
+}
+
+export function isRecordCountMetric(value?: string) {
+  return value === RECORD_COUNT_METRIC || value?.endsWith(".__count") === true;
 }
 
 export function aggregationOrFallback(value: AggregationType | undefined, fallback: Aggregation = "sum"): Aggregation {
@@ -106,26 +169,21 @@ export function getVisibleDatasetColumns(dataset: Dataset): DatasetColumnConfig[
 export function parseCsvDataset(name: string, csv: string, sourceType: Dataset["sourceType"] = "csv", sourceUrl?: string, projectId = ""): Dataset {
   const parsed = Papa.parse<Record<string, unknown>>(csv, { header: true, skipEmptyLines: true, dynamicTyping: false });
   if (parsed.errors.length) throw new Error(parsed.errors[0]?.message ?? "No se pudo leer el CSV.");
-  const rawRows = parsed.data;
-  const keys = Object.keys(rawRows[0] ?? {});
-  const columns = keys.map((key) => ({
-    id: uuid(),
-    name: key.trim(),
-    type: inferColumnType(rawRows.map((row) => row[key])),
-  }));
+  return buildDatasetFromRows(name, parsed.data, sourceType, sourceUrl, projectId);
+}
 
-  const timestamp = new Date().toISOString();
-  return {
-    id: uuid(),
-    projectId,
-    name,
-    sourceType,
-    sourceUrl,
-    columns,
-    rows: normalizeRows(rawRows, columns),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
+export function parseXlsxDataset(name: string, data: ArrayBuffer, sourceUrl?: string, projectId = ""): Dataset {
+  const workbook = read(data, { type: "array", cellDates: true });
+  const firstSheet = workbook.SheetNames[0];
+  if (!firstSheet) throw new Error("El archivo XLSX no tiene hojas para importar.");
+
+  const worksheet = workbook.Sheets[firstSheet];
+  const rawRows = utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+    defval: "",
+    raw: true,
+  });
+
+  return buildDatasetFromRows(name, rawRows, "xlsx", sourceUrl, projectId);
 }
 
 export async function fetchPublishedCsv(url: string) {
@@ -195,6 +253,7 @@ export type BuildSeriesV2Row = {
 
 function metricFromInput(metric: MetricInput, fallbackAggregation: Aggregation): WidgetMetric {
   if (typeof metric !== "string") return metric;
+  if (isRecordCountMetric(metric)) return { id: RECORD_COUNT_METRIC, label: RECORD_COUNT_LABEL, aggregation: "count" };
   return { id: metric, column: metric, label: metric, aggregation: fallbackAggregation };
 }
 
@@ -203,7 +262,7 @@ function resolveMetrics(config: BuildSeriesV2Config): WidgetMetric[] {
   const metrics = config.metrics?.filter(Boolean).map((metric) => metricFromInput(metric, fallbackAggregation)) ?? [];
   if (metrics.length) return metrics;
   if (config.metric) return [{ id: config.metric, column: config.metric, label: config.metric, aggregation: fallbackAggregation }];
-  return [{ id: "registros", label: "Registros", aggregation: "count" }];
+  return [{ id: RECORD_COUNT_METRIC, label: RECORD_COUNT_LABEL, aggregation: "count" }];
 }
 
 function tokenizeFormula(formula: string, row: DatasetRow): FormulaToken[] | undefined {
@@ -395,9 +454,11 @@ export function buildSeriesV2(dataset: Dataset | undefined, config: BuildSeriesV
 }
 
 export function buildSeries(dataset: Dataset | undefined, config: { dimension?: string; metric?: string; aggregation: Aggregation; globalFilters?: WidgetFilter[]; filters?: WidgetFilter[]; limit?: number; orderDirection?: "asc" | "desc" }) {
-  const metricId = config.metric ?? "registros";
+  const metricId = config.metric ?? RECORD_COUNT_METRIC;
   return buildSeriesV2(dataset, {
     ...config,
-    metrics: [{ id: metricId, column: config.metric, label: metricId, aggregation: config.aggregation }],
+    metrics: [isRecordCountMetric(metricId)
+      ? { id: RECORD_COUNT_METRIC, label: RECORD_COUNT_LABEL, aggregation: "count" }
+      : { id: metricId, column: config.metric, label: metricId, aggregation: config.aggregation }],
   }).map((row) => ({ label: config.dimension ? row.label : metricId, value: row.values[metricId] ?? 0 }));
 }

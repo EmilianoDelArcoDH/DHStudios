@@ -9,6 +9,10 @@ export const legendPositionSchema = z.enum(["top", "bottom", "left", "right"]);
 export const valueFormatSchema = z.enum(["number", "currency", "percentage"]);
 export const chartOrientationSchema = z.enum(["vertical", "horizontal"]);
 export const chartStylePresetSchema = z.enum(["modern", "minimal", "corporate", "vibrant"]);
+export const dimensionGroupingModeSchema = z.enum(["none", "top_n", "bottom_n"]);
+export const contentAlignSchema = z.enum(["left", "center", "right"]);
+export const legendLayoutSchema = z.enum(["auto", "list"]);
+export const textAlignSchema = z.enum(["left", "center", "right", "justify"]);
 export const widgetTypeSchema = z.enum([
   "bar",
   "horizontal_bar",
@@ -89,9 +93,13 @@ export const widgetConfigSchema: z.ZodType<ChartConfig> = z.object({
   orderBy: z.string().optional(),
   orderDirection: z.enum(["asc", "desc"]).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
+  dimensionGroupingMode: dimensionGroupingModeSchema.optional(),
+  groupRemainingAsOthers: z.boolean().optional(),
   colorPalette: z.array(z.string()).optional(),
   showLegend: z.boolean().optional(),
   legendPosition: legendPositionSchema.optional(),
+  legendAlign: contentAlignSchema.optional(),
+  legendLayout: legendLayoutSchema.optional(),
   showGrid: z.boolean().optional(),
   smooth: z.boolean().optional(),
   stack: z.boolean().optional(),
@@ -106,6 +114,11 @@ export const widgetStyleSchema: z.ZodType<WidgetStyle> = z.object({
   showTitle: z.boolean().optional(),
   fontFamily: z.string().optional(),
   fontSize: z.coerce.number().min(8).max(72).optional(),
+  contentAlign: contentAlignSchema.optional(),
+  textAlign: textAlignSchema.optional(),
+  fontWeight: z.enum(["normal", "bold"]).optional(),
+  fontStyle: z.enum(["normal", "italic"]).optional(),
+  textDecoration: z.enum(["none", "underline"]).optional(),
   color: z.string().optional(),
   background: z.string().optional(),
   borderColor: z.string().optional(),
@@ -119,6 +132,8 @@ export const widgetStyleSchema: z.ZodType<WidgetStyle> = z.object({
   showDataLabels: z.boolean().optional(),
   showPiePercent: z.boolean().optional(),
   stackSeries: z.boolean().optional(),
+  showHeatmap: z.boolean().optional(),
+  heatmapColor: z.string().optional(),
   imageUrl: z.string().url().or(z.literal("")).optional(),
   text: z.string().optional(),
 });
@@ -138,7 +153,7 @@ export const datasetSchema: z.ZodType<Dataset> = z.object({
   projectId: z.string().min(1),
   ownerId: z.string().optional(),
   name: z.string().min(1, "El nombre es obligatorio."),
-  sourceType: z.enum(["csv", "google_sheets", "manual", "unknown"]),
+  sourceType: z.enum(["csv", "xlsx", "google_sheets", "manual", "unknown"]),
   sourceUrl: z.string().url().nullable().optional(),
   columns: z.array(datasetColumnSchema),
   columnConfig: z.array(datasetColumnConfigSchema).optional(),

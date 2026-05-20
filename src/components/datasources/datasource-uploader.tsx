@@ -5,7 +5,7 @@ import { Database, FileUp, Link } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { parseCsvDataset, fetchPublishedCsv } from "@/lib/dataset";
+import { fetchPublishedCsv, parseCsvDataset, parseXlsxDataset } from "@/lib/dataset";
 import { createDemoDataset } from "@/lib/demo-data";
 import { useEditorStore } from "@/store/editor-store";
 
@@ -17,10 +17,15 @@ export function DatasourceUploader() {
   const onFile = async (file?: File) => {
     if (!file) return;
     try {
-      addDataset(parseCsvDataset(file.name.replace(/\.csv$/i, ""), await file.text()));
+      const datasetName = file.name.replace(/\.(csv|xlsx)$/i, "");
+      if (/\.xlsx$/i.test(file.name)) {
+        addDataset(parseXlsxDataset(datasetName, await file.arrayBuffer()));
+      } else {
+        addDataset(parseCsvDataset(datasetName, await file.text()));
+      }
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "CSV inválido.");
+      setError(err instanceof Error ? err.message : "Archivo invalido.");
     }
   };
 
@@ -38,10 +43,10 @@ export function DatasourceUploader() {
     <div className="space-y-3">
       <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-[var(--dh-border)] bg-card text-sm font-semibold hover:bg-accent">
         <FileUp className="h-4 w-4" />
-        Subir CSV
+        Subir CSV o XLSX
         <input
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           className="hidden"
           onChange={(event) => {
             void onFile(event.target.files?.[0]);
