@@ -5,13 +5,13 @@ export function exportReport(report: Report): string {
   return JSON.stringify(payload, null, 2);
 }
 
-export function importReport(json: string): Report {
+export function importReport(json: string, options?: { projectId?: string }): Report {
   const payload = JSON.parse(json) as ReportExport;
   if (payload.version !== 1 || !payload.report?.pages || !payload.report?.datasets) {
     throw new Error("El JSON no tiene formato de reporte valido.");
   }
 
-  const projectId = crypto.randomUUID();
+  const projectId = options?.projectId ?? crypto.randomUUID();
   const now = new Date().toISOString();
   const datasetIdMap = new Map(payload.report.datasets.map((dataset) => [dataset.id, crypto.randomUUID()]));
   const pageIdMap = new Map(payload.report.pages.map((page) => [page.id, crypto.randomUUID()]));

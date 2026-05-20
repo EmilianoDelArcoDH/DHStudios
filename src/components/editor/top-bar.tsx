@@ -31,6 +31,7 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
   const activePage = report.pages.find((page) => page.id === activePageId) ?? report.pages[0];
   const [shareOpen, setShareOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "sharing" | "copied" | "error">("idle");
+  const [importError, setImportError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(APPEARANCE_STORAGE_KEY) === "dark";
@@ -93,11 +94,13 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
 
   const upload = async (file?: File) => {
     if (!file) return;
-    const imported = importReport(await file.text());
-    setReport(imported);
-    await reportService.saveReport(imported);
-    if (imported.projectId !== report.projectId) {
-      window.location.href = `/editor/${imported.projectId}`;
+    try {
+      setImportError(null);
+      const imported = importReport(await file.text(), { projectId: report.projectId });
+      setReport(imported);
+      await reportService.saveReport(imported);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "No se pudo importar el JSON.");
     }
   };
 
@@ -252,6 +255,20 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={Boolean(importError)} onOpenChange={(open) => {
+        if (!open) setImportError(null);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>No se pudo importar</DialogTitle>
+            <DialogDescription>{importError ?? "Ocurrio un error al importar el archivo JSON."}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setImportError(null)}>Cerrar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -302,12 +319,9 @@ export function MenuBar() {
 
   const upload = async (file?: File) => {
     if (!file) return;
-    const imported = importReport(await file.text());
+    const imported = importReport(await file.text(), { projectId: report.projectId });
     setReport(imported);
     await reportService.saveReport(imported);
-    if (imported.projectId !== report.projectId) {
-      window.location.href = `/editor/${imported.projectId}`;
-    }
   };
 
   const publish = async () => {
