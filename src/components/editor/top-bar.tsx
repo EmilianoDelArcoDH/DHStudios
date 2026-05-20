@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronRight, Copy, Download, Eye, FileJson, LayoutGrid, Presentation, Save, Share2, UserCircle } from "lucide-react";
 import { EditorSettingsSheet } from "@/components/editor/editor-settings-sheet";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
     setReport,
   } = useEditorStore();
   const activePage = report.pages.find((page) => page.id === activePageId) ?? report.pages[0];
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "sharing" | "copied" | "error">("idle");
   const [importError, setImportError] = useState<string | null>(null);
@@ -104,6 +105,10 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
     }
   };
 
+  const openImportPicker = () => {
+    importInputRef.current?.click();
+  };
+
   const publicUrl = typeof window !== "undefined" ? `${window.location.origin}/view/${report.projectId}` : "";
 
   const openShareDialog = async () => {
@@ -177,6 +182,11 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
         )}
 
         <div className="flex items-center gap-1.5">
+          {!readonly ? <input ref={importInputRef} type="file" accept="application/json" className="hidden" onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            void upload(file);
+          }} /> : null}
           {!readonly ? (
             <TooltipButton label="Guardar" shortcut="Ctrl S">
               <Button variant="default" size="sm" onClick={() => void autosave()} disabled={loading}>
@@ -201,12 +211,9 @@ export function TopBar({ readonly = false, onPreview }: { readonly?: boolean; on
                   Exportar JSON
                 </DropdownMenuItem>
                 {!readonly ? (
-                  <DropdownMenuItem>
-                    <label className="flex w-full cursor-pointer items-center gap-1.5">
-                      <FileJson className="h-4 w-4" />
-                      Importar
-                      <input type="file" accept="application/json" className="hidden" onChange={(event) => void upload(event.target.files?.[0])} />
-                    </label>
+                  <DropdownMenuItem onClick={openImportPicker}>
+                    <FileJson className="h-4 w-4" />
+                    Importar
                   </DropdownMenuItem>
                 ) : null}
               </DropdownMenuGroup>
@@ -368,20 +375,29 @@ function TopMenu({
   onToggleLocked,
 }: TopMenuProps) {
   const hasSelection = Boolean(selectedWidgetId);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="flex items-center gap-0.5 overflow-x-auto text-sm">
+      <input
+        ref={importInputRef}
+        type="file"
+        accept="application/json"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          void onUpload(file);
+        }}
+      />
       <MenuRoot label="Archivo">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Informe</DropdownMenuLabel>
           <DropdownMenuItem onClick={onSave}>Guardar</DropdownMenuItem>
           <DropdownMenuItem onClick={onShare}>Compartir</DropdownMenuItem>
           <DropdownMenuItem onClick={onDownload}>Descargar</DropdownMenuItem>
-          <DropdownMenuItem>
-            <label className="flex w-full cursor-pointer items-center gap-1.5">
-              Importar
-              <input type="file" accept="application/json" className="hidden" onChange={(event) => void onUpload(event.target.files?.[0])} />
-            </label>
+          <DropdownMenuItem onClick={() => importInputRef.current?.click()}>
+            Importar
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </MenuRoot>
