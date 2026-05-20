@@ -36,7 +36,7 @@ export function EditorShell({ projectId, readonly = false }: { projectId: string
   useEffect(() => {
     let active = true;
     void reportService
-      .getReportByProjectId(projectId)
+      .getReportByProjectId(projectId, { publicOnly: readonly })
       .then((loaded) => {
         if (!active) return;
         if (!loaded) {
